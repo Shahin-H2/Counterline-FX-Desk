@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#132b2c" />
+    <meta name="description" content="A clear currency reference and customer pricing board for exchange counters." />
+    <title>Counterline — FX Desk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/src/app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="#top" aria-label="Counterline FX Desk home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+          <span class="brand-copy"><strong>counterline</strong><small>FX DESK</small></span>
+        </a>
+
+        <div class="sidebar-label">WORKSPACE</div>
+        <nav class="nav-list">
+          <a class="nav-item is-active" href="#rates" aria-current="page">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14M6 3v14M14 3v14" /></svg>
+            <span>Rates board</span>
+            <span class="nav-count" id="nav-pair-count">08</span>
+          </a>
+          <a class="nav-item" href="#pricing">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5v15M14.5 6.5c0-1.3-1.8-2.3-4.2-2.3S6 5.1 6 6.5s1.2 2 4.3 2.7 4.2 1.4 4.2 2.8-1.8 2.7-4.2 2.7S6 13.6 6 12.2" /></svg>
+            <span>Desk pricing</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-spacer"></div>
+        <div class="sidebar-source">
+          <span class="source-dot" aria-hidden="true"></span>
+          <div><strong>Reference feed</strong><span id="sidebar-feed-status">Connecting…</span></div>
+        </div>
+        <div class="sidebar-footer">
+          <span class="avatar">FX</span>
+          <div class="profile-copy"><strong>Local workspace</strong><span>Single device</span></div>
+          <span class="profile-menu" aria-hidden="true">•••</span>
+        </div>
+      </aside>
+
+      <main id="top" class="main-content">
+        <header class="topbar">
+          <div class="breadcrumb"><span>Workspace</span><span class="crumb-divider">/</span><strong>Rates board</strong></div>
+          <div class="topbar-right">
+            <span class="local-label"><span class="pulse-dot" aria-hidden="true"></span> LOCAL MODE</span>
+            <span class="topbar-date" id="today-label"></span>
+          </div>
+        </header>
+
+        <section id="rates" class="page-heading">
+          <div>
+            <div class="eyebrow">EXCHANGE OPERATIONS <span>·</span> COUNTER 01</div>
+            <h1>Rates board<span class="heading-period">.</span></h1>
+            <p class="page-subtitle">Your reference market and customer prices, in one clear view.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="button button-secondary" id="refresh-button" type="button">
+              <svg class="refresh-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16.4 8A6.6 6.6 0 0 0 4.8 5.7L3.5 7M3.5 7V3.8M3.5 7h3.3M3.6 12a6.6 6.6 0 0 0 11.6 2.3l1.3-1.3m0 0v3.2m0-3.2h-3.3" /></svg>
+              <span>Refresh</span>
+            </button>
+            <button class="button button-primary" id="add-pair-button" type="button">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
+              Add pair
+            </button>
+          </div>
+        </section>
+
+        <section class="status-grid" aria-label="Reference data status">
+          <article class="status-card source-card">
+            <div class="status-icon source-icon" aria-hidden="true">
+              <svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="7.8"/><path d="M3.7 11h14.6M11 3.2c2.1 2.1 3.1 4.7 3.1 7.8s-1 5.7-3.1 7.8c-2.1-2.1-3.1-4.7-3.1-7.8s1-5.7 3.1-7.8Z"/></svg>
+            </div>
+            <div class="status-card-copy"><span>REFERENCE SOURCE</span><strong>Frankfurter <span class="source-type">Daily blend</span></strong><small>Central bank & official data</small></div>
+            <span class="status-tag" id="feed-pill"><span class="status-dot"></span><span>Loading</span></span>
+          </article>
+          <article class="status-card date-card">
+            <div class="status-icon calendar-icon" aria-hidden="true">
+              <svg viewBox="0 0 22 22"><rect x="3.5" y="5.5" width="15" height="13" rx="2"/><path d="M7 3.5v4M15 3.5v4M3.5 9.5h15M7.5 13h2M12.5 13h2M7.5 16h2"/></svg>
+            </div>
+            <div class="status-card-copy"><span>RATE DATE</span><strong id="rate-date">Waiting for data</strong><small id="checked-at">Observation date, not a live quote</small></div>
+          </article>
+          <article class="status-card semantic-card">
+            <div class="semantic-badge">i</div>
+            <div class="status-card-copy"><span>IMPORTANT DISTINCTION</span><strong>Indicative reference ≠ desk price</strong><small>Customer rates are set by your team below.</small></div>
+          </article>
+        </section>
+
+        <div id="feed-alert" class="feed-alert" role="status" aria-live="polite" hidden></div>
+
+        <section class="board-layout">
+          <div class="board-main">
+            <div class="board-toolbar">
+              <div class="board-title-group"><div class="section-title-row"><h2>Currency pairs</h2><span class="pair-total" id="pair-total">8 pairs</span></div><p>Rates show quote currency received for one unit of base.</p></div>
+              <label class="search-field">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.6"/><path d="m13 13 4 4"/></svg>
+                <span class="sr-only">Search currencies</span>
+                <input id="search-input" type="search" placeholder="Find a currency" autocomplete="off" />
+                <kbd>/</kbd>
+              </label>
+            </div>
+
+            <div class="table-wrap">
+              <table class="rates-table">
+                <thead>
+                  <tr>
+                    <th class="pair-column">PAIR <span class="sort-mark">↕</span></th>
+                    <th class="reference-column">REFERENCE <span class="th-sub">QUOTE / BASE</span></th>
+                    <th class="customer-column buy-column">WE BUY BASE <span class="th-sub">CUSTOMER SELLS</span></th>
+                    <th class="customer-column sell-column">WE SELL BASE <span class="th-sub">CUSTOMER BUYS</span></th>
+                    <th class="row-actions-column"><span class="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody id="rates-body">
+                  <tr class="loading-row"><td colspan="5"><span class="loading-spinner"></span>Loading reference rates…</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="empty-search" class="empty-search" hidden><strong>No pairs found</strong><span>Try a currency code or name.</span></div>
+
+            <div class="table-footnote">
+              <span class="footnote-mark">↗</span>
+              <span>Reference rates are indicative and do not represent a transaction offer. Check each currency’s source terms before displaying rates commercially.</span>
+              <a href="https://frankfurter.dev/license/" target="_blank" rel="noreferrer">Data terms <span aria-hidden="true">↗</span></a>
+            </div>
+          </div>
+
+          <aside class="right-rail" aria-label="Pricing tools">
+            <section class="pricing-card" id="pricing">
+              <div class="card-kicker"><span class="kicker-icon">$</span> YOUR COUNTER</div>
+              <h2>Set your prices</h2>
+              <p>Reference rates stay separate. Add your own buy and sell prices for each pair.</p>
+              <div class="pricing-legend">
+                <div><span class="legend-swatch buy-swatch"></span><span><strong>We buy base</strong><small>Customer sells base to you</small></span></div>
+                <div><span class="legend-swatch sell-swatch"></span><span><strong>We sell base</strong><small>Customer buys base from you</small></span></div>
+              </div>
+              <div class="rule-box"><span class="rule-icon">⌁</span><span>Enter the customer rate as <strong>quote units per 1 base unit</strong>. No spread or fee is added automatically.</span></div>
+              <button class="button button-dark button-full" id="first-price-button" type="button">Set first customer price <span aria-hidden="true">→</span></button>
+              <div class="saved-locally"><span class="lock-icon" aria-hidden="true">◈</span>Prices save in this browser only</div>
+            </section>
+
+            <section class="calc-card">
+              <div class="calc-header"><div><div class="card-kicker">QUICK CHECK</div><h3>Counter calculator</h3></div><span class="calc-symbol" aria-hidden="true">⌗</span></div>
+              <p>Estimate a customer exchange using your saved desk price.</p>
+              <label class="calc-select-label" for="calculator-pair">Currency pair</label>
+              <select id="calculator-pair" aria-label="Calculator currency pair"></select>
+              <label class="calc-select-label" for="calculator-amount">Customer gives</label>
+              <div class="amount-input-wrap"><span id="calculator-base-code">USD</span><input id="calculator-amount" type="number" min="0" step="any" value="100" inputmode="decimal" /></div>
+              <div class="calc-results" id="calculator-results" aria-live="polite">
+                <div><span>We buy base</span><strong id="calculator-buy-result">Set a desk rate</strong></div>
+                <div><span>We sell base</span><strong id="calculator-sell-result">Set a desk rate</strong></div>
+              </div>
+              <div class="calc-rounding">Result rounded to the quote currency’s minor unit.</div>
+            </section>
+
+            <section class="source-note">
+              <div class="source-note-top"><span class="source-logo">f.</span><strong>About the reference feed</strong><span class="external-mark" aria-hidden="true">↗</span></div>
+              <p>Frankfurter blends daily rates from central banks and official sources. Values can be late, missing or revised.</p>
+              <a href="https://frankfurter.dev/" target="_blank" rel="noreferrer">View source documentation <span aria-hidden="true">→</span></a>
+            </section>
+          </aside>
+        </section>
+
+        <footer class="page-footer"><span>COUNTERLINE <span class="footer-divider">/</span> FX DESK</span><span>Reference data for operational context only.</span></footer>
+      </main>
+    </div>
+
+    <dialog class="app-dialog" id="pair-dialog" aria-labelledby="pair-dialog-title">
+      <form id="pair-form" method="dialog">
+        <div class="dialog-top"><div><div class="eyebrow">RATE BOARD</div><h2 id="pair-dialog-title">Add a currency pair</h2></div><button class="icon-button dialog-close" type="button" data-close-dialog aria-label="Close dialog">×</button></div>
+        <p class="dialog-copy">Choose the direction you want to track. Available currencies come from the reference feed.</p>
+        <div class="pair-selectors">
+          <label>BASE CURRENCY<select name="base" id="pair-base" required></select></label>
+          <span class="pair-arrow" aria-hidden="true">→</span>
+          <label>QUOTE CURRENCY<select name="quote" id="pair-quote" required></select></label>
+        </div>
+        <div class="pair-preview" id="pair-preview"><span>PAIR PREVIEW</span><strong>USD → EUR</strong><small>Reference rate will be loaded after adding.</small></div>
+        <div class="dialog-actions"><button class="button button-secondary" type="button" data-close-dialog>Cancel</button><button class="button button-primary" type="submit">Add to board <span aria-hidden="true">→</span></button></div>
+      </form>
+    </dialog>
+
+    <dialog class="app-dialog" id="price-dialog" aria-labelledby="price-dialog-title">
+      <form id="price-form" method="dialog">
+        <input type="hidden" name="pair" id="price-pair-id" />
+        <div class="dialog-top"><div><div class="eyebrow">CUSTOMER PRICING</div><h2 id="price-dialog-title">Set desk prices</h2></div><button class="icon-button dialog-close" type="button" data-close-dialog aria-label="Close dialog">×</button></div>
+        <p class="dialog-copy" id="price-dialog-description">Enter direct customer rates. These values are independent of the reference feed.</p>
+        <div class="reference-callout"><span>REFERENCE RATE</span><strong id="price-reference-rate">Unavailable</strong><small id="price-reference-date">For context only</small></div>
+        <div class="price-fields">
+          <label class="price-field buy-field"><span><strong>We buy base</strong><small>Customer sells base</small></span><div class="price-input"><span class="price-quote-code"></span><input name="buy" id="price-buy" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 0.9200" maxlength="24" /></div></label>
+          <label class="price-field sell-field"><span><strong>We sell base</strong><small>Customer buys base</small></span><div class="price-input"><span class="price-quote-code"></span><input name="sell" id="price-sell" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 0.9400" maxlength="24" /></div></label>
+        </div>
+        <p class="validation-message" id="price-validation" role="alert" hidden></p>
+        <div class="dialog-footnote">Rates are saved exactly as entered. The calculator rounds the resulting payout to the quote currency’s minor unit. No fees or additional rounding rules are applied.</div>
+        <div class="dialog-actions"><button class="button button-danger-quiet" type="button" id="clear-price-button">Clear prices</button><span class="dialog-action-spacer"></span><button class="button button-secondary" type="button" data-close-dialog>Cancel</button><button class="button button-primary" type="submit">Save prices</button></div>
+      </form>
+    </dialog>
+
+    <div class="sr-only" id="announcements" aria-live="polite" aria-atomic="true"></div>
+  </body>
+</html>
