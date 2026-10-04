@@ -147,14 +147,14 @@
 
             <section class="calc-card">
               <div class="calc-header"><div><div class="card-kicker">QUICK CHECK</div><h3>Counter calculator</h3></div><span class="calc-symbol" aria-hidden="true">⌗</span></div>
-              <p>Estimate a customer exchange using your saved desk price.</p>
+              <p>Compare the quote value for the same base amount at either desk price.</p>
               <label class="calc-select-label" for="calculator-pair">Currency pair</label>
               <select id="calculator-pair" aria-label="Calculator currency pair"></select>
-              <label class="calc-select-label" for="calculator-amount">Customer gives</label>
+              <label class="calc-select-label" for="calculator-amount">Base amount</label>
               <div class="amount-input-wrap"><span id="calculator-base-code">USD</span><input id="calculator-amount" type="number" min="0" step="any" value="100" inputmode="decimal" /></div>
               <div class="calc-results" id="calculator-results" aria-live="polite">
-                <div><span>We buy base</span><strong id="calculator-buy-result">Set a desk rate</strong></div>
-                <div><span>We sell base</span><strong id="calculator-sell-result">Set a desk rate</strong></div>
+                <div><span>We buy base · desk pays</span><strong id="calculator-buy-result">Set a desk rate</strong></div>
+                <div><span>We sell base · customer pays</span><strong id="calculator-sell-result">Set a desk rate</strong></div>
               </div>
               <div class="calc-rounding">Result rounded to the quote currency’s minor unit.</div>
             </section>
