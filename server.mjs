@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createReferenceService } from "./src/server/reference-service.mjs";
-import { fetchFrankfurterCurrencies } from "./src/server/frankfurter-provider.mjs";
+import { fetchFrankfurterCurrencies, fetchFrankfurterHistory } from "./src/server/frankfurter-provider.mjs";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const referenceService = createReferenceService();
@@ -18,6 +18,23 @@ const MIME_TYPES = {
 };
 
 let currencyCache;
+const historyCache = new Map();
+const HISTORY_RANGES = { "1d": { days: 1 }, "1w": { days: 7 }, "1m": { months: 1 }, "3m": { months: 3 }, "6m": { months: 6 } };
+
+function historyDates(range, instant = new Date()) {
+  const to = new Date(Date.UTC(instant.getUTCFullYear(), instant.getUTCMonth(), instant.getUTCDate()));
+  const from = new Date(to);
+  const rangeInfo = HISTORY_RANGES[range];
+  if (rangeInfo.days) from.setUTCDate(from.getUTCDate() - rangeInfo.days);
+  if (rangeInfo.months) {
+    const day = from.getUTCDate();
+    from.setUTCDate(1);
+    from.setUTCMonth(from.getUTCMonth() - rangeInfo.months);
+    const lastDay = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 0)).getUTCDate();
+    from.setUTCDate(Math.min(day, lastDay));
+  }
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+}
 
 function sendJson(response, status, payload) {
   response.writeHead(status, {
@@ -58,6 +75,33 @@ const server = createServer(async (request, response) => {
       sendJson(response, 200, await referenceService.getRates(pairs));
     } catch {
       sendJson(response, 503, { error: "Reference data is unavailable. Try again shortly." });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/history") {
+    const pairs = parsePairs(url.searchParams.get("pairs"));
+    const range = url.searchParams.get("range");
+    if (!pairs || !Object.hasOwn(HISTORY_RANGES, range)) {
+      sendJson(response, 400, { error: "Provide up to 30 currency pairs and a supported daily range." });
+      return;
+    }
+    const { from, to } = historyDates(range);
+    const key = `${from}:${to}:${range}:${pairs.map((pair) => `${pair.base}/${pair.quote}`).sort().join("|")}`;
+    const now = Date.now();
+    const cached = historyCache.get(key);
+    if (cached && cached.expiresAt > now) {
+      sendJson(response, 200, { ...cached.payload, cacheStatus: "cached" });
+      return;
+    }
+    try {
+      const payload = await fetchFrankfurterHistory(pairs, { from, to });
+      if (Object.values(payload.rates).some((observations) => observations.length)) {
+        historyCache.set(key, { payload, expiresAt: now + 15 * 60 * 1000 });
+      }
+      sendJson(response, 200, { ...payload, cacheStatus: "fresh" });
+    } catch {
+      sendJson(response, 503, { error: "Historical reference data is unavailable. Try again shortly." });
     }
     return;
   }
@@ -110,4 +154,3 @@ const server = createServer(async (request, response) => {
 server.listen(port, host, () => {
   console.log(`Counterline FX Desk running at http://${host}:${port}`);
 });
-
