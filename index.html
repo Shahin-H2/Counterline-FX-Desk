@@ -191,15 +191,21 @@
 
             <section class="calc-card">
               <div class="calc-header"><div><div class="card-kicker">QUICK CHECK</div><h3>Counter calculator</h3></div><span class="calc-symbol" aria-hidden="true">⌗</span></div>
-              <p>Compare the quote value for the same base amount at either desk price.</p>
-              <label class="calc-select-label" for="calculator-pair">Currency pair</label>
-              <select id="calculator-pair" aria-label="Calculator currency pair"></select>
+              <p>Choose any available currency pair for an indicative reference conversion. Desk prices appear when the pair is on your board.</p>
+              <div class="calc-pair-controls">
+                <label class="calc-pair-field" for="calculator-base"><span>FROM</span><select id="calculator-base" aria-label="Base currency"></select></label>
+                <button class="swap-currencies" id="swap-currencies" type="button" aria-label="Swap base and quote currencies" title="Swap currencies">⇄</button>
+                <label class="calc-pair-field" for="calculator-quote"><span>TO</span><select id="calculator-quote" aria-label="Quote currency"></select></label>
+              </div>
               <label class="calc-select-label" for="calculator-amount">Base amount</label>
               <div class="amount-input-wrap"><span id="calculator-base-code">USD</span><input id="calculator-amount" type="number" min="0" step="any" value="100" inputmode="decimal" /></div>
               <div class="calc-results" id="calculator-results" aria-live="polite">
+                <div class="calc-reference-row"><span>Indicative reference estimate</span><strong id="calculator-reference-result">Choose currencies</strong></div>
+                <small class="calc-reference-meta" id="calculator-reference-meta">Frankfurter daily reference · not a customer quote</small>
                 <div><span>We buy base · desk pays</span><strong id="calculator-buy-result">Set a desk rate</strong></div>
                 <div><span>We sell base · customer pays</span><strong id="calculator-sell-result">Set a desk rate</strong></div>
               </div>
+              <button class="button button-secondary calc-add-pair" id="calculator-add-pair" type="button" hidden>Add pair to board <span aria-hidden="true">→</span></button>
               <div class="calc-rounding">Result rounded to the quote currency’s minor unit.</div>
             </section>
 
