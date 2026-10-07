@@ -815,6 +815,38 @@ function populateDate() {
   document.querySelector("#today-label").textContent = new Intl.DateTimeFormat(locale, { weekday: "short", month: "short", day: "numeric" }).format(new Date());
 }
 
+function initializeWorkspaceNavigation() {
+  const links = [...document.querySelectorAll(".nav-item[href^='#']")];
+  const destinations = links.map((link) => ({ link, section: document.querySelector(link.getAttribute("href")) })).filter(({ section }) => section);
+  if (!destinations.length) return;
+
+  const activate = (activeLink) => {
+    for (const { link } of destinations) {
+      const isActive = link === activeLink;
+      link.classList.toggle("is-active", isActive);
+      if (isActive) link.setAttribute("aria-current", "location");
+      else link.removeAttribute("aria-current");
+    }
+  };
+  const syncToScrollPosition = () => {
+    const readingLine = window.innerHeight * 0.4;
+    const current = [...destinations].reverse().find(({ section }) => section.getBoundingClientRect().top <= readingLine);
+    activate((current ?? destinations[0]).link);
+  };
+
+  destinations.forEach(({ link }) => link.addEventListener("click", () => activate(link)));
+  window.addEventListener("hashchange", syncToScrollPosition);
+  let scrollFrame = 0;
+  window.addEventListener("scroll", () => {
+    if (scrollFrame) return;
+    scrollFrame = window.requestAnimationFrame(() => {
+      scrollFrame = 0;
+      syncToScrollPosition();
+    });
+  }, { passive: true });
+  syncToScrollPosition();
+}
+
 function initializeEvents() {
   let draggedPairId = null;
   document.addEventListener("pointerdown", (event) => {
@@ -985,6 +1017,7 @@ function initializeEvents() {
 applyViewPreferences({ persist: false });
 populateDate();
 initializeEvents();
+initializeWorkspaceNavigation();
 renderTable();
 const browserCache = readReferenceCache();
 if (browserCache) {
