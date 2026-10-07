@@ -45,11 +45,16 @@ const elements = {
   priceReferenceRate: document.querySelector("#price-reference-rate"),
   priceReferenceDate: document.querySelector("#price-reference-date"),
   priceValidation: document.querySelector("#price-validation"),
-  calculatorPair: document.querySelector("#calculator-pair"),
+  calculatorBase: document.querySelector("#calculator-base"),
+  calculatorQuote: document.querySelector("#calculator-quote"),
+  swapCurrencies: document.querySelector("#swap-currencies"),
   calculatorBaseCode: document.querySelector("#calculator-base-code"),
   calculatorAmount: document.querySelector("#calculator-amount"),
+  calculatorReferenceResult: document.querySelector("#calculator-reference-result"),
+  calculatorReferenceMeta: document.querySelector("#calculator-reference-meta"),
   calculatorBuyResult: document.querySelector("#calculator-buy-result"),
   calculatorSellResult: document.querySelector("#calculator-sell-result"),
+  calculatorAddPair: document.querySelector("#calculator-add-pair"),
   announcements: document.querySelector("#announcements"),
 };
 
@@ -97,6 +102,8 @@ let referenceMeta = { cacheStatus: "loading", errors: [], retrievedAt: null, che
 let currencies = [];
 let searchTerm = "";
 let hasAnimatedRows = false;
+const calculatorLookupState = new Map();
+let previousCalculatorSelection = { base: "USD", quote: "EUR" };
 
 function pairParts(id) {
   const [base, quote] = id.split("/");
@@ -334,12 +341,21 @@ async function loadCurrencies() {
     const body = await response.json();
     if (!Array.isArray(body.currencies)) throw new Error("Unexpected currency list");
     currencies = body.currencies.filter((item) => /^[A-Z]{3}$/.test(item.code) && typeof item.name === "string");
+    currencies = ensureIranianRial(currencies);
     writeJson(CURRENCY_CACHE_KEY, currencies);
   } catch {
     const cached = readJson(CURRENCY_CACHE_KEY, []);
     if (Array.isArray(cached)) currencies = cached.filter((item) => item && /^[A-Z]{3}$/.test(item.code) && typeof item.name === "string");
+    currencies = ensureIranianRial(currencies);
   }
   renderCalculatorOptions();
+  const selectedPair = currentCalculatorPair();
+  if (!settings.pairs.includes(selectedPair)) refreshCalculatorReference(selectedPair);
+}
+
+function ensureIranianRial(list) {
+  if (list.some((currency) => currency.code === "IRR")) return list;
+  return [...list, { code: "IRR", name: "Iranian Rial", symbol: "﷼" }];
 }
 
 async function loadRates({ announceSuccess = false } = {}) {
@@ -399,35 +415,140 @@ async function loadRates({ announceSuccess = false } = {}) {
 }
 
 function renderCalculatorOptions() {
-  const previous = elements.calculatorPair.value;
-  elements.calculatorPair.innerHTML = settings.pairs.map((id) => {
-    const { base, quote } = pairParts(id);
-    return `<option value="${escapeHtml(id)}">${escapeHtml(base)} → ${escapeHtml(quote)}</option>`;
-  }).join("");
-  if (settings.pairs.includes(previous)) elements.calculatorPair.value = previous;
+  const previousBase = elements.calculatorBase.value;
+  const previousQuote = elements.calculatorQuote.value;
+  const options = [...currencies];
+  for (const id of settings.pairs) {
+    for (const code of id.split("/")) {
+      if (!options.some((currency) => currency.code === code)) options.push({ code, name: code });
+    }
+  }
+  if (!options.some((currency) => currency.code === "IRR")) options.push({ code: "IRR", name: "Iranian Rial", symbol: "﷼" });
+  options.sort((a, b) => a.code.localeCompare(b.code));
+  const markup = options.map(({ code, name }) => `<option value="${escapeHtml(code)}">${escapeHtml(code)} · ${escapeHtml(name)}</option>`).join("");
+  elements.calculatorBase.innerHTML = markup;
+  elements.calculatorQuote.innerHTML = markup;
+  const preferred = pairParts(settings.pairs[0] ?? "USD/EUR");
+  elements.calculatorBase.value = options.some((currency) => currency.code === previousBase) ? previousBase : options.some((currency) => currency.code === preferred.base) ? preferred.base : options[0]?.code ?? "";
+  elements.calculatorQuote.value = options.some((currency) => currency.code === previousQuote && currency.code !== elements.calculatorBase.value)
+    ? previousQuote
+    : options.some((currency) => currency.code === preferred.quote && currency.code !== elements.calculatorBase.value)
+      ? preferred.quote
+      : options.find((currency) => currency.code !== elements.calculatorBase.value)?.code ?? "";
+  previousCalculatorSelection = { base: elements.calculatorBase.value, quote: elements.calculatorQuote.value };
   renderCalculator();
 }
 
+function currentCalculatorPair() {
+  const base = elements.calculatorBase.value;
+  const quote = elements.calculatorQuote.value;
+  return base && quote && base !== quote ? `${base}/${quote}` : "";
+}
+
 function renderCalculator() {
-  const id = elements.calculatorPair.value;
-  if (!id || !settings.pairs.includes(id)) {
-    elements.calculatorBaseCode.textContent = "—";
-    elements.calculatorBuyResult.textContent = "Add a currency pair";
-    elements.calculatorSellResult.textContent = "Add a currency pair";
+  const id = currentCalculatorPair();
+  if (!id) {
+    elements.calculatorBaseCode.textContent = elements.calculatorBase.value || "—";
+    elements.calculatorReferenceResult.textContent = "Choose two different currencies";
+    elements.calculatorReferenceMeta.textContent = "Select a base and quote currency to continue.";
+    elements.calculatorBuyResult.textContent = "Choose a pair";
+    elements.calculatorSellResult.textContent = "Choose a pair";
+    elements.calculatorAddPair.hidden = true;
     return;
   }
   const { base, quote } = pairParts(id);
   const amount = elements.calculatorAmount.value || "0";
+  const onBoard = settings.pairs.includes(id);
+  const rate = referenceRates[id];
   const prices = settings.prices[id] ?? {};
+  const amountValue = parseDecimal(amount);
   elements.calculatorBaseCode.textContent = base;
+  const referenceResult = rate && amountValue && amountValue.coefficient > 0n
+    ? multiplyAndRound(amount, rate.rate, amountDigits(quote))
+    : null;
+  const lookupState = calculatorLookupState.get(id);
+  elements.calculatorReferenceResult.textContent = referenceResult
+    ? `${formatDecimal(referenceResult, locale, amountDigits(quote), amountDigits(quote))} ${quote}`
+    : !amountValue || amountValue.coefficient <= 0n
+      ? "Enter an amount"
+      : lookupState === "loading" ? "Looking up reference…" : "Reference rate unavailable";
+  if (rate) {
+    const stale = isObservationStale(rate.date, new Date()) || rate.cacheFallback || (onBoard && ["stale-cache", "error"].includes(referenceMeta.cacheStatus));
+    const cached = rate.cacheFallback || lookupState === "cached" || (onBoard && ["cached", "stale-cache", "error", "browser-cache-pending"].includes(referenceMeta.cacheStatus));
+    elements.calculatorReferenceMeta.textContent = `Frankfurter daily reference · ${formatDate(rate.date)}${stale ? " · STALE" : cached ? " · CACHED" : ""} · not a customer quote`;
+  } else {
+    elements.calculatorReferenceMeta.textContent = lookupState === "error" || lookupState === "missing"
+      ? "No Frankfurter observation is available for this pair."
+      : "Frankfurter daily reference · not a customer quote";
+  }
   for (const [side, output] of [["buy", elements.calculatorBuyResult], ["sell", elements.calculatorSellResult]]) {
     const rate = prices[side];
-    const amountValue = parseDecimal(amount);
     const result = rate && amountValue && amountValue.coefficient > 0n
       ? multiplyAndRound(amount, rate, amountDigits(quote))
       : null;
-    output.textContent = result ? `${formatDecimal(result, locale, amountDigits(quote), amountDigits(quote))} ${quote}` : rate ? "Enter an amount" : "Set a desk rate";
+    output.textContent = result ? `${formatDecimal(result, locale, amountDigits(quote), amountDigits(quote))} ${quote}` : rate ? "Enter an amount" : onBoard ? "Set a desk rate" : "Pair is not on board";
   }
+  elements.calculatorAddPair.hidden = onBoard;
+}
+
+function refreshCalculatorReference(id, { force = false } = {}) {
+  if (!id || (!force && calculatorLookupState.has(id))) return;
+  calculatorLookupState.set(id, "loading");
+  renderCalculator();
+  const pair = pairParts(id);
+  const query = encodeURIComponent(`${pair.base}:${pair.quote}`);
+  fetch(`/api/rates?pairs=${query}`, { headers: { accept: "application/json" } })
+    .then(async (response) => {
+      if (!response.ok) throw new Error("Reference lookup failed");
+      return response.json();
+    })
+    .then((body) => {
+      const rate = body.rates?.[id];
+      if (rate) {
+        const cacheFallback = Boolean(rate.cacheFallback) || body.cacheStatus === "stale-cache";
+        referenceRates[id] = { ...rate, cacheFallback };
+        calculatorLookupState.set(id, cacheFallback || ["cached", "partial-cache", "browser-cache-pending"].includes(body.cacheStatus) ? "cached" : "ready");
+        writeJson(REFERENCE_CACHE_KEY, { rates: referenceRates, retrievedAt: body.retrievedAt ?? new Date().toISOString(), source: body.source });
+      } else {
+        calculatorLookupState.set(id, referenceRates[id] ? "cached" : "missing");
+      }
+      if (currentCalculatorPair() === id) renderCalculator();
+    })
+    .catch(() => {
+      calculatorLookupState.set(id, referenceRates[id] ? "cached" : "error");
+      if (currentCalculatorPair() === id) renderCalculator();
+    });
+}
+
+function changeCalculatorCurrencies(changed) {
+  if (elements.calculatorBase.value === elements.calculatorQuote.value) {
+    const currenciesAvailable = [...elements.calculatorBase.options].map((option) => option.value);
+    const currentCode = changed === "base" ? elements.calculatorBase.value : elements.calculatorQuote.value;
+    const previousAlternate = changed === "base" ? previousCalculatorSelection.base : previousCalculatorSelection.quote;
+    const alternate = previousAlternate !== currentCode && currenciesAvailable.includes(previousAlternate)
+      ? previousAlternate
+      : currenciesAvailable.find((code) => code !== currentCode);
+    if (changed === "base") elements.calculatorQuote.value = alternate ?? "";
+    else elements.calculatorBase.value = alternate ?? "";
+  }
+  previousCalculatorSelection = { base: elements.calculatorBase.value, quote: elements.calculatorQuote.value };
+  const id = currentCalculatorPair();
+  renderCalculator();
+  refreshCalculatorReference(id);
+}
+
+function addCalculatorPairToBoard() {
+  const id = currentCalculatorPair();
+  if (!id || settings.pairs.includes(id)) return;
+  if (settings.pairs.length >= MAX_BOARD_PAIRS) {
+    announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`);
+    return;
+  }
+  settings.pairs.push(id);
+  const saved = saveSettings();
+  renderTable({ animatePair: id, highlightPair: id });
+  loadRates();
+  announce(saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
 }
 
 function applyViewPreferences({ persist = true } = {}) {
@@ -540,7 +661,10 @@ function initializeEvents() {
   });
   document.querySelector("#add-pair-button").addEventListener("click", openPairDialog);
   document.querySelector("#first-price-button").addEventListener("click", () => openPriceDialog(settings.pairs[0]));
-  elements.refreshButton.addEventListener("click", () => loadRates({ announceSuccess: true }));
+  elements.refreshButton.addEventListener("click", () => {
+    loadRates({ announceSuccess: true });
+    refreshCalculatorReference(currentCalculatorPair(), { force: true });
+  });
   elements.searchInput.addEventListener("input", () => { searchTerm = elements.searchInput.value; renderTable(); });
   elements.optionsToggle.addEventListener("click", () => {
     const opening = elements.displayOptions.hidden;
@@ -618,7 +742,15 @@ function initializeEvents() {
   for (const dialog of [elements.pairDialog, elements.priceDialog]) {
     dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
   }
-  elements.calculatorPair.addEventListener("change", renderCalculator);
+  elements.calculatorBase.addEventListener("change", () => changeCalculatorCurrencies("base"));
+  elements.calculatorQuote.addEventListener("change", () => changeCalculatorCurrencies("quote"));
+  elements.swapCurrencies.addEventListener("click", () => {
+    const base = elements.calculatorBase.value;
+    elements.calculatorBase.value = elements.calculatorQuote.value;
+    elements.calculatorQuote.value = base;
+    changeCalculatorCurrencies("quote");
+  });
+  elements.calculatorAddPair.addEventListener("click", addCalculatorPairToBoard);
   elements.calculatorAmount.addEventListener("input", renderCalculator);
   document.addEventListener("keydown", (event) => {
     if (event.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName) && !elements.pairDialog.open && !elements.priceDialog.open) {
