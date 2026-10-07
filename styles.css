@@ -230,11 +230,20 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
 .edit-price-button:active { transform: scale(.95); }
 .edit-price-button svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .action-cell { text-align: right; }
+.row-actions-column { width: 158px; min-width: 158px; }
+.row-actions { display: flex; justify-content: flex-end; align-items: center; gap: 2px; }
 .row-action { display: inline-grid; place-items: center; width: 25px; height: 25px; border: 1px solid transparent; border-radius: 4px; color: #a3aca5; background: transparent; }
 .row-action { transition: transform .18s ease, border-color .18s ease, color .18s ease, background .18s ease; }
 .row-action:hover { transform: rotate(-5deg); border-color: #e7ebe5; color: #50655b; background: #f7f9f5; }
 .row-action:active, .icon-button:active { transform: scale(.92); }
 .row-action svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.row-action:disabled { opacity: .35; cursor: not-allowed; }
+.row-drag-handle { cursor: grab; font-size: 16px; touch-action: none; }
+.row-drag-handle:active { cursor: grabbing; }
+.row-flip { color: #61806a; font-size: 16px; }
+.rates-table tbody tr.is-dragging { opacity: .38; }
+.rates-table tbody tr.drop-before > td { box-shadow: inset 0 2px var(--forest); }
+.rates-table tbody tr.drop-after > td { box-shadow: inset 0 -2px var(--forest); }
 .loading-row td { height: 150px; color: #87928c; text-align: center; font-size: 14px; }
 .loading-spinner { display: inline-block; width: 13px; height: 13px; margin-right: 8px; vertical-align: -3px; border: 2px solid #e4eadf; border-top-color: #74925c; border-radius: 50%; animation: rotate .7s linear infinite; }
 .table-footnote { display: flex; align-items: flex-start; gap: 8px; padding: 12px 16px; border-top: 1px solid #edf0eb; color: #919c95; background: #fcfdfb; font-size: 11px; line-height: 1.45; }
@@ -514,6 +523,9 @@ body[data-theme="night"] .price-readout.sell-price { color: #ebd39d; }
 body[data-theme="night"] .edit-price-button { color: #a4b5a9; }
 body[data-theme="night"] .edit-price-button:hover { color: #d8ebd6; background: #294137; }
 body[data-theme="night"] .row-action:hover { border-color: #405449; color: #d9e7dc; background: #263a30; }
+body[data-theme="night"] .row-flip { color: #c1dda2; }
+body[data-theme="night"] .rates-table tbody tr.drop-before > td { box-shadow: inset 0 2px #c9e28c; }
+body[data-theme="night"] .rates-table tbody tr.drop-after > td { box-shadow: inset 0 -2px #c9e28c; }
 body[data-theme="night"] .table-footnote { color: #9aad9f; background: #151f1d; }
 body[data-theme="night"] .table-footnote a, body[data-theme="night"] .source-note a { color: #c6dda0; }
 body[data-theme="night"] .empty-search { color: #a3b4a9; }
