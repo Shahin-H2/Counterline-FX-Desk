@@ -303,6 +303,7 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
       const { base, quote } = pairParts(id);
       const rate = referenceRates[id];
       const pairPrices = settings.prices[id] ?? { buy: "", sell: "" };
+      const boardIndex = settings.pairs.indexOf(id);
       const rowClasses = [animateRows || animatePair === id ? "row-enter" : "", highlightPair === id ? "row-highlight" : ""].filter(Boolean).join(" ");
       const stale = rate && (isObservationStale(rate.date, new Date()) || rate.cacheFallback || referenceMeta.cacheStatus === "stale-cache" || referenceMeta.cacheStatus === "error");
       const cached = rate && (rate.cacheFallback || referenceMeta.cacheStatus === "stale-cache" || referenceMeta.cacheStatus === "error" || referenceMeta.cacheStatus === "browser-cache-pending");
@@ -315,7 +316,13 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
         <td>${refValue}</td>
         <td><div class="customer-price">${priceText(pairPrices.buy, quote)}<button class="edit-price-button" type="button" data-edit-price="${escapeHtml(id)}" aria-label="${pairPrices.buy ? "Edit" : "Set"} desk buy price for ${escapeHtml(id)}">${pairPrices.buy ? "Edit" : "Set rate"}</button></div></td>
         <td><div class="customer-price">${priceText(pairPrices.sell, quote, "sell-price")}<button class="edit-price-button" type="button" data-edit-price="${escapeHtml(id)}" aria-label="${pairPrices.sell ? "Edit" : "Set"} desk sell price for ${escapeHtml(id)}">${pairPrices.sell ? "Edit" : "Set rate"}</button></div></td>
-        <td class="action-cell"><button class="row-action" type="button" data-remove-pair="${escapeHtml(id)}" aria-label="Remove ${escapeHtml(id)} from the rate board"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10M8 6V4h4v2m2 0-.6 9.5H6.6L6 6m2.5 2.5v4m3-4v4" /></svg></button></td>
+        <td class="action-cell"><div class="row-actions">
+          <button class="row-action row-drag-handle" type="button" draggable="true" data-drag-pair="${escapeHtml(id)}" aria-label="Drag ${escapeHtml(id)} to reorder it" title="Drag to reorder">⠿</button>
+          <button class="row-action" type="button" data-move-pair="${escapeHtml(id)}" data-move-direction="up" aria-label="Move ${escapeHtml(id)} earlier in board order" title="Move earlier" ${boardIndex === 0 ? "disabled" : ""}>↑</button>
+          <button class="row-action" type="button" data-move-pair="${escapeHtml(id)}" data-move-direction="down" aria-label="Move ${escapeHtml(id)} later in board order" title="Move later" ${boardIndex === settings.pairs.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="row-action row-flip" type="button" data-flip-pair="${escapeHtml(id)}" aria-label="Reverse ${escapeHtml(id)} to ${escapeHtml(quote)}/${escapeHtml(base)}" title="Reverse pair direction">↔</button>
+          <button class="row-action" type="button" data-remove-pair="${escapeHtml(id)}" aria-label="Remove ${escapeHtml(id)} from the rate board" title="Remove pair"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10M8 6V4h4v2m2 0-.6 9.5H6.6L6 6m2.5 2.5v4m3-4v4" /></svg></button>
+        </div></td>
       </tr>`;
     }).join("");
   }
@@ -551,6 +558,55 @@ function addCalculatorPairToBoard() {
   announce(saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
 }
 
+function reorderPair(sourceId, targetId, afterTarget = false, { restoreFocus = true } = {}) {
+  if (sourceId === targetId) return;
+  const sourceIndex = settings.pairs.indexOf(sourceId);
+  if (sourceIndex < 0 || !settings.pairs.includes(targetId)) return;
+  const [source] = settings.pairs.splice(sourceIndex, 1);
+  let targetIndex = settings.pairs.indexOf(targetId);
+  if (afterTarget) targetIndex += 1;
+  settings.pairs.splice(targetIndex, 0, source);
+  view.sort = "board";
+  applyViewPreferences();
+  const saved = saveSettings();
+  renderTable();
+  if (restoreFocus) {
+    const controls = [...elements.ratesBody.querySelectorAll("[data-move-pair]")].filter((button) => button.dataset.movePair === sourceId);
+    (controls.find((button) => !button.disabled) ?? controls[0])?.focus();
+  }
+  announce(saved ? "Currency pair order saved." : "Currency pair order changed for this session; browser storage is unavailable.");
+}
+
+function movePairInBoard(id, direction) {
+  const index = settings.pairs.indexOf(id);
+  const targetIndex = index + (direction === "up" ? -1 : 1);
+  if (index < 0 || targetIndex < 0 || targetIndex >= settings.pairs.length) return;
+  reorderPair(id, settings.pairs[targetIndex], direction === "down");
+}
+
+function flipPairDirection(id) {
+  const index = settings.pairs.indexOf(id);
+  if (index < 0) return;
+  const { base, quote } = pairParts(id);
+  const flippedId = `${quote}/${base}`;
+  if (settings.pairs.includes(flippedId)) {
+    announce(`${flippedId} is already on the board.`);
+    return;
+  }
+  settings.pairs[index] = flippedId;
+  const saved = saveSettings();
+  if (currentCalculatorPair() === id) {
+    elements.calculatorBase.value = quote;
+    elements.calculatorQuote.value = base;
+    previousCalculatorSelection = { base: quote, quote: base };
+  }
+  renderTable({ highlightPair: flippedId });
+  loadRates();
+  announce(saved
+    ? `${id} direction changed to ${flippedId}. Desk prices remain separate for each direction.`
+    : `${id} direction changed for this session. Desk prices remain separate for each direction.`);
+}
+
 function applyViewPreferences({ persist = true } = {}) {
   document.body.dataset.theme = view.theme;
   document.body.dataset.density = view.density;
@@ -651,6 +707,7 @@ function populateDate() {
 }
 
 function initializeEvents() {
+  let draggedPairId = null;
   document.addEventListener("pointerdown", (event) => {
     const button = event.target.closest(".button");
     if (!button || button.disabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -723,6 +780,16 @@ function initializeEvents() {
       openPriceDialog(editButton.dataset.editPrice);
       return;
     }
+    const flipButton = event.target.closest("[data-flip-pair]");
+    if (flipButton) {
+      flipPairDirection(flipButton.dataset.flipPair);
+      return;
+    }
+    const moveButton = event.target.closest("[data-move-pair]");
+    if (moveButton) {
+      movePairInBoard(moveButton.dataset.movePair, moveButton.dataset.moveDirection);
+      return;
+    }
     const removeButton = event.target.closest("[data-remove-pair]");
     if (removeButton) {
       const id = removeButton.dataset.removePair;
@@ -738,6 +805,40 @@ function initializeEvents() {
         announce(saved ? `${id} removed from the rates board.` : `${id} removed for this session; browser storage is unavailable.`);
       }, delay);
     }
+  });
+  elements.ratesBody.addEventListener("dragstart", (event) => {
+    const handle = event.target.closest("[data-drag-pair]");
+    if (!handle) return;
+    draggedPairId = handle.dataset.dragPair;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", draggedPairId);
+    handle.closest("tr")?.classList.add("is-dragging");
+  });
+  elements.ratesBody.addEventListener("dragover", (event) => {
+    if (!draggedPairId) return;
+    const targetRow = event.target.closest("tr[data-pair]");
+    if (!targetRow || targetRow.dataset.pair === draggedPairId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    elements.ratesBody.querySelectorAll(".drop-before, .drop-after").forEach((row) => row.classList.remove("drop-before", "drop-after"));
+    const bounds = targetRow.getBoundingClientRect();
+    const afterTarget = event.clientY > bounds.top + bounds.height / 2;
+    targetRow.classList.add(afterTarget ? "drop-after" : "drop-before");
+  });
+  elements.ratesBody.addEventListener("drop", (event) => {
+    if (!draggedPairId) return;
+    const targetRow = event.target.closest("tr[data-pair]");
+    if (!targetRow) return;
+    event.preventDefault();
+    const sourceId = draggedPairId;
+    const targetId = targetRow.dataset.pair;
+    const afterTarget = targetRow.classList.contains("drop-after");
+    draggedPairId = null;
+    reorderPair(sourceId, targetId, afterTarget, { restoreFocus: false });
+  });
+  elements.ratesBody.addEventListener("dragend", () => {
+    draggedPairId = null;
+    elements.ratesBody.querySelectorAll(".is-dragging, .drop-before, .drop-after").forEach((row) => row.classList.remove("is-dragging", "drop-before", "drop-after"));
   });
   for (const dialog of [elements.pairDialog, elements.priceDialog]) {
     dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
