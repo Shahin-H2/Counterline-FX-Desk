@@ -80,6 +80,7 @@ let referenceRates = {};
 let referenceMeta = { cacheStatus: "loading", errors: [], retrievedAt: null, checkedAt: null };
 let currencies = [];
 let searchTerm = "";
+let hasAnimatedRows = false;
 
 function pairParts(id) {
   const [base, quote] = id.split("/");
@@ -222,7 +223,7 @@ function priceText(price, quote, className = "") {
   return `<span class="price-readout ${className}">${escapeHtml(formatPairRate(price))} <small>${escapeHtml(quote)}</small></span>`;
 }
 
-function renderTable() {
+function renderTable({ animateRows = false, animatePair = null, highlightPair = null } = {}) {
   elements.pairTotal.textContent = `${settings.pairs.length} pair${settings.pairs.length === 1 ? "" : "s"}`;
   elements.navPairCount.textContent = String(settings.pairs.length).padStart(2, "0");
   if (!settings.pairs.length) {
@@ -243,17 +244,18 @@ function renderTable() {
   if (!visiblePairs.length) {
     elements.ratesBody.innerHTML = "";
   } else {
-    elements.ratesBody.innerHTML = visiblePairs.map((id) => {
+    elements.ratesBody.innerHTML = visiblePairs.map((id, index) => {
       const { base, quote } = pairParts(id);
       const rate = referenceRates[id];
       const pairPrices = settings.prices[id] ?? { buy: "", sell: "" };
+      const rowClasses = [animateRows || animatePair === id ? "row-enter" : "", highlightPair === id ? "row-highlight" : ""].filter(Boolean).join(" ");
       const stale = rate && (isObservationStale(rate.date, new Date()) || rate.cacheFallback || referenceMeta.cacheStatus === "stale-cache" || referenceMeta.cacheStatus === "error");
       const cached = rate && (rate.cacheFallback || referenceMeta.cacheStatus === "stale-cache" || referenceMeta.cacheStatus === "error" || referenceMeta.cacheStatus === "browser-cache-pending");
       const refDate = rate ? formatDate(rate.date, { month: "short", day: "numeric" }) : "—";
       const refValue = rate
         ? `<div class="reference-value ${stale ? "is-stale" : ""}"><strong>${escapeHtml(formatPairRate(rate.rate))} <small>${escapeHtml(quote)}</small></strong><small>1 ${escapeHtml(base)} · ${escapeHtml(refDate)}${cached ? " · CACHED" : stale ? " · STALE" : ""}</small></div>`
         : `<div class="reference-value is-missing"><strong>${referenceMeta.cacheStatus === "loading" ? "Loading…" : "No source rate"}</strong><small>${referenceMeta.cacheStatus === "loading" ? "" : "Coverage unavailable"}</small></div>`;
-      return `<tr data-pair="${escapeHtml(id)}">
+      return `<tr class="${rowClasses}" style="--row-delay:${Math.min(index, 6) * 45}ms" data-pair="${escapeHtml(id)}">
         <td><div class="pair-cell"><span class="currency-chip">${escapeHtml(base.slice(0, 2))}</span><div class="pair-names"><strong>${escapeHtml(base)} <span aria-hidden="true">→</span> ${escapeHtml(quote)}</strong><small>${escapeHtml(currencyName(base))} / ${escapeHtml(currencyName(quote))}</small></div></div></td>
         <td>${refValue}</td>
         <td><div class="customer-price">${priceText(pairPrices.buy, quote)}<button class="edit-price-button" type="button" data-edit-price="${escapeHtml(id)}" aria-label="${pairPrices.buy ? "Edit" : "Set"} desk buy price for ${escapeHtml(id)}">${pairPrices.buy ? "Edit" : "Set rate"}</button></div></td>
@@ -262,6 +264,7 @@ function renderTable() {
       </tr>`;
     }).join("");
   }
+  if (animateRows) hasAnimatedRows = true;
   updateFeedStatus();
   renderCalculatorOptions();
 }
@@ -326,7 +329,7 @@ async function loadRates({ announceSuccess = false } = {}) {
     if (Object.keys(returnedRates).length) {
       writeJson(REFERENCE_CACHE_KEY, { rates: referenceRates, retrievedAt: referenceMeta.retrievedAt, source: body.source });
     }
-    renderTable();
+    renderTable({ animateRows: !hasAnimatedRows });
     renderCalculator();
     if (announceSuccess) announce("Reference rates refreshed.");
   } catch {
@@ -338,7 +341,7 @@ async function loadRates({ announceSuccess = false } = {}) {
       retrievedAt: cached?.retrievedAt ?? null,
       checkedAt: new Date().toISOString(),
     };
-    renderTable();
+    renderTable({ animateRows: !hasAnimatedRows });
     renderCalculator();
     if (announceSuccess) announce("The reference provider could not be reached.");
   } finally {
@@ -459,7 +462,7 @@ function handlePriceSave(event) {
   else delete settings.prices[id];
   const saved = saveSettings();
   closeDialog(elements.priceDialog);
-  renderTable();
+  renderTable({ highlightPair: id });
   renderCalculator();
   announce(saved ? `${id} desk prices saved on this browser.` : `${id} prices are active for this session, but browser storage is unavailable.`);
 }
@@ -469,6 +472,14 @@ function populateDate() {
 }
 
 function initializeEvents() {
+  document.addEventListener("pointerdown", (event) => {
+    const button = event.target.closest(".button");
+    if (!button || button.disabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    button.classList.remove("is-tapped");
+    void button.offsetWidth;
+    button.classList.add("is-tapped");
+    window.setTimeout(() => button.classList.remove("is-tapped"), 440);
+  });
   document.querySelector("#add-pair-button").addEventListener("click", openPairDialog);
   document.querySelector("#first-price-button").addEventListener("click", () => openPriceDialog(settings.pairs[0]));
   elements.refreshButton.addEventListener("click", () => loadRates({ announceSuccess: true }));
@@ -488,7 +499,7 @@ function initializeEvents() {
     settings.pairs.push(id);
     const saved = saveSettings();
     closeDialog(elements.pairDialog);
-    renderTable();
+    renderTable({ animatePair: id, highlightPair: id });
     renderCalculatorOptions();
     loadRates();
     announce(saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
@@ -499,7 +510,7 @@ function initializeEvents() {
     delete settings.prices[id];
     const saved = saveSettings();
     closeDialog(elements.priceDialog);
-    renderTable();
+    renderTable({ highlightPair: id });
     renderCalculator();
     announce(saved ? `${id} customer prices cleared.` : `${id} prices cleared for this session; browser storage is unavailable.`);
   });
@@ -517,11 +528,17 @@ function initializeEvents() {
     const removeButton = event.target.closest("[data-remove-pair]");
     if (removeButton) {
       const id = removeButton.dataset.removePair;
-      settings.pairs = settings.pairs.filter((pair) => pair !== id);
-      delete settings.prices[id];
-      const saved = saveSettings();
-      renderTable();
-      announce(saved ? `${id} removed from the rates board.` : `${id} removed for this session; browser storage is unavailable.`);
+      if (removeButton.disabled) return;
+      removeButton.disabled = true;
+      removeButton.closest("tr")?.classList.add("row-leaving");
+      const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180;
+      window.setTimeout(() => {
+        settings.pairs = settings.pairs.filter((pair) => pair !== id);
+        delete settings.prices[id];
+        const saved = saveSettings();
+        renderTable();
+        announce(saved ? `${id} removed from the rates board.` : `${id} removed for this session; browser storage is unavailable.`);
+      }, delay);
     }
   });
   for (const dialog of [elements.pairDialog, elements.priceDialog]) {
@@ -544,7 +561,7 @@ const browserCache = readReferenceCache();
 if (browserCache) {
   referenceRates = browserCache.rates;
   referenceMeta = { cacheStatus: "browser-cache-pending", errors: [], retrievedAt: browserCache.retrievedAt, checkedAt: browserCache.retrievedAt };
-  renderTable();
+  renderTable({ animateRows: true });
 }
 loadCurrencies();
 loadRates();
