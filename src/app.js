@@ -55,6 +55,9 @@ const elements = {
   calculatorBuyResult: document.querySelector("#calculator-buy-result"),
   calculatorSellResult: document.querySelector("#calculator-sell-result"),
   calculatorAddPair: document.querySelector("#calculator-add-pair"),
+  historyGrid: document.querySelector("#history-grid"),
+  historyStatus: document.querySelector("#history-status"),
+  historyRanges: document.querySelector(".history-controls"),
   announcements: document.querySelector("#announcements"),
 };
 
@@ -104,6 +107,10 @@ let searchTerm = "";
 let hasAnimatedRows = false;
 const calculatorLookupState = new Map();
 let previousCalculatorSelection = { base: "USD", quote: "EUR" };
+let historyRange = "1m";
+let pairHistory = {};
+let historyRequestId = 0;
+let historyLoading = false;
 
 function pairParts(id) {
   const [base, quote] = id.split("/");
@@ -132,6 +139,104 @@ function formatCheckedAt(value) {
 
 function formatPairRate(rate) {
   return formatDecimal(rate, locale, 2, 8);
+}
+
+function historyChartMarkup(id, observations, cardIndex) {
+  const { base, quote } = pairParts(id);
+  const points = (Array.isArray(observations) ? observations : [])
+    .filter((item) => item && /^\d{4}-\d{2}-\d{2}$/.test(item.date) && Number.isFinite(Number(item.rate)) && Number(item.rate) > 0)
+    .map((item) => ({ date: item.date, rate: String(item.rate), value: Number(item.rate) }));
+  const currencyLabel = `${currencyName(base)} / ${currencyName(quote)}`;
+  if (!points.length) {
+    if (historyLoading) {
+      return `<article class="history-card history-card-loading" role="listitem" aria-hidden="true"><div class="history-loading-line"></div><div class="history-loading-rate"></div><div class="history-loading-chart"></div></article>`;
+    }
+    return `<article class="history-card history-card-empty" role="listitem"><div class="history-card-title"><div><h3>${escapeHtml(base)} <span aria-hidden="true">→</span> ${escapeHtml(quote)}</h3><p>${escapeHtml(currencyLabel)}</p></div></div><div class="history-empty-state"><span class="history-empty-icon" aria-hidden="true">⌁</span><strong>No history in this range</strong><span>The source may not publish on these dates or cover this currency.</span></div></article>`;
+  }
+
+  const width = 680;
+  const height = 190;
+  const plot = { left: 64, right: 666, top: 16, bottom: 143 };
+  const values = points.map((point) => point.value);
+  const observedMin = Math.min(...values);
+  const observedMax = Math.max(...values);
+  const padding = observedMax === observedMin ? Math.max(Math.abs(observedMax) * 0.035, 0.00000001) : (observedMax - observedMin) * 0.12;
+  const low = Math.max(0, observedMin - padding);
+  const high = observedMax + padding;
+  const span = high - low || 1;
+  const coordinate = (point, index) => ({
+    x: points.length === 1 ? (plot.left + plot.right) / 2 : plot.left + (plot.right - plot.left) * index / (points.length - 1),
+    y: plot.bottom - (point.value - low) / span * (plot.bottom - plot.top),
+  });
+  const coords = points.map(coordinate);
+  const line = coords.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
+  const area = `${line} L${coords.at(-1).x.toFixed(2)} ${plot.bottom} L${coords[0].x.toFixed(2)} ${plot.bottom} Z`;
+  const gradientId = `history-area-${cardIndex}`;
+  const yLabels = [high, (high + low) / 2, low];
+  const grid = yLabels.map((value, index) => {
+    const y = plot.top + (plot.bottom - plot.top) * index / 2;
+    return `<g class="history-gridline"><line x1="${plot.left}" y1="${y.toFixed(2)}" x2="${plot.right}" y2="${y.toFixed(2)}"/><text x="${plot.left - 10}" y="${(y + 4).toFixed(2)}" text-anchor="end">${escapeHtml(formatPairRate(String(value)))}</text></g>`;
+  }).join("");
+  const dots = coords.map((point, index) => `<circle class="history-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="2.35"><title>${escapeHtml(formatDate(points[index].date))}: ${escapeHtml(formatPairRate(points[index].rate))} ${escapeHtml(quote)}</title></circle>`).join("");
+  const firstDate = formatDate(points[0].date, { month: "short", day: "numeric" });
+  const lastDate = formatDate(points.at(-1).date, { month: "short", day: "numeric" });
+  const latest = points.at(-1);
+  const ariaLabel = `${base} to ${quote} daily reference rate from ${formatDate(points[0].date)} to ${formatDate(latest.date)}`;
+  return `<article class="history-card" role="listitem">
+    <div class="history-card-title"><div><h3>${escapeHtml(base)} <span aria-hidden="true">→</span> ${escapeHtml(quote)}</h3><p>${escapeHtml(currencyLabel)}</p></div><span class="history-observation-count">${points.length} ${points.length === 1 ? "point" : "points"}</span></div>
+    <div class="history-latest"><span>1 ${escapeHtml(base)} <span aria-hidden="true">=</span></span><strong>${escapeHtml(formatPairRate(latest.rate))}</strong><small>${escapeHtml(quote)} · ${escapeHtml(formatDate(latest.date))}</small></div>
+    <svg class="history-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(ariaLabel)}">
+      <defs><linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="var(--chart-line)" stop-opacity=".2"/><stop offset="100%" stop-color="var(--chart-line)" stop-opacity="0"/></linearGradient></defs>
+      ${grid}<path class="history-area" d="${area}" fill="url(#${gradientId})"/><path class="history-line" d="${line}"/>${dots}
+      <text class="history-axis-label" x="${plot.left}" y="${height - 5}">${escapeHtml(firstDate)}</text><text class="history-axis-label" x="${plot.right}" y="${height - 5}" text-anchor="end">${escapeHtml(lastDate)}</text>
+    </svg>
+    <div class="history-card-footer"><span><i class="history-stat-dot history-stat-low"></i>Low <strong>${escapeHtml(formatPairRate(String(observedMin)))}</strong></span><span><i class="history-stat-dot"></i>High <strong>${escapeHtml(formatPairRate(String(observedMax)))}</strong></span></div>
+  </article>`;
+}
+
+function renderPairHistory() {
+  if (!elements.historyGrid) return;
+  elements.historyGrid.setAttribute("aria-busy", String(historyLoading));
+  elements.historyGrid.innerHTML = settings.pairs.length
+    ? settings.pairs.map((id, index) => historyChartMarkup(id, pairHistory[id], index)).join("")
+    : '<div class="history-board-empty" role="listitem"><strong>No currency pairs yet</strong><span>Add a pair to see its rate history here.</span></div>';
+}
+
+async function loadPairHistory() {
+  const requestId = ++historyRequestId;
+  if (!settings.pairs.length) {
+    pairHistory = {};
+    historyLoading = false;
+    renderPairHistory();
+    elements.historyStatus.textContent = "Add currency pairs to view daily history.";
+    return;
+  }
+  pairHistory = {};
+  historyLoading = true;
+  renderPairHistory();
+  elements.historyStatus.textContent = "Loading daily reference history…";
+  const pairs = [...settings.pairs];
+  const query = encodeURIComponent(pairs.map((id) => id.replace("/", ":")).join("|"));
+  try {
+    const response = await fetch(`/api/history?pairs=${query}&range=${encodeURIComponent(historyRange)}`, { headers: { accept: "application/json" } });
+    if (!response.ok) throw new Error("Historical data unavailable");
+    const body = await response.json();
+    if (requestId !== historyRequestId) return;
+    historyLoading = false;
+    pairHistory = body.rates && typeof body.rates === "object" ? body.rates : {};
+    const coveredPairs = pairs.filter((id) => Array.isArray(pairHistory[id]) && pairHistory[id].length).length;
+    const hasErrors = Array.isArray(body.errors) && body.errors.length > 0;
+    elements.historyStatus.textContent = hasErrors || coveredPairs < pairs.length
+      ? `Daily history · ${coveredPairs} of ${pairs.length} pairs have observations in this range. Gaps or unsupported currencies may leave some charts empty.`
+      : `Daily reference history · ${pairs.length} ${pairs.length === 1 ? "pair" : "pairs"} · ${historyRange.toUpperCase()} view`;
+    renderPairHistory();
+  } catch {
+    if (requestId !== historyRequestId) return;
+    historyLoading = false;
+    pairHistory = {};
+    elements.historyStatus.textContent = "Historical rates could not be loaded. Try selecting the range again.";
+    renderPairHistory();
+  }
 }
 
 function amountDigits(code) {
@@ -254,6 +359,7 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
     elements.emptySearch.hidden = true;
     renderCalculatorOptions();
     updateFeedStatus();
+    renderPairHistory();
     return;
   }
 
@@ -329,6 +435,7 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
   if (animateRows) hasAnimatedRows = true;
   updateFeedStatus();
   renderCalculatorOptions();
+  renderPairHistory();
 }
 
 function readReferenceCache() {
@@ -555,6 +662,7 @@ function addCalculatorPairToBoard() {
   const saved = saveSettings();
   renderTable({ animatePair: id, highlightPair: id });
   loadRates();
+  loadPairHistory();
   announce(saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
 }
 
@@ -602,6 +710,7 @@ function flipPairDirection(id) {
   }
   renderTable({ highlightPair: flippedId });
   loadRates();
+  loadPairHistory();
   announce(saved
     ? `${id} direction changed to ${flippedId}. Desk prices remain separate for each direction.`
     : `${id} direction changed for this session. Desk prices remain separate for each direction.`);
@@ -720,7 +829,17 @@ function initializeEvents() {
   document.querySelector("#first-price-button").addEventListener("click", () => openPriceDialog(settings.pairs[0]));
   elements.refreshButton.addEventListener("click", () => {
     loadRates({ announceSuccess: true });
+    loadPairHistory();
     refreshCalculatorReference(currentCalculatorPair(), { force: true });
+  });
+  elements.historyRanges.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-history-range]");
+    if (!button || button.disabled || historyRange === button.dataset.historyRange) return;
+    historyRange = button.dataset.historyRange;
+    elements.historyRanges.querySelectorAll("[data-history-range]").forEach((rangeButton) => {
+      rangeButton.setAttribute("aria-pressed", String(rangeButton === button));
+    });
+    loadPairHistory();
   });
   elements.searchInput.addEventListener("input", () => { searchTerm = elements.searchInput.value; renderTable(); });
   elements.optionsToggle.addEventListener("click", () => {
@@ -757,6 +876,7 @@ function initializeEvents() {
     renderTable({ animatePair: id, highlightPair: id });
     renderCalculatorOptions();
     loadRates();
+    loadPairHistory();
     announce(saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
   });
   elements.priceForm.addEventListener("submit", handlePriceSave);
@@ -802,6 +922,7 @@ function initializeEvents() {
         delete settings.prices[id];
         const saved = saveSettings();
         renderTable();
+        loadPairHistory();
         announce(saved ? `${id} removed from the rates board.` : `${id} removed for this session; browser storage is unavailable.`);
       }, delay);
     }
@@ -873,4 +994,5 @@ if (browserCache) {
 }
 loadCurrencies();
 loadRates();
+loadPairHistory();
 window.setInterval(() => { if (document.visibilityState === "visible") loadRates(); }, 30 * 60 * 1000);
