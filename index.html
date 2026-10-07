@@ -96,15 +96,59 @@
 
         <section class="board-layout">
           <div class="board-main">
-            <div class="board-toolbar">
-              <div class="board-title-group"><div class="section-title-row"><h2>Currency pairs</h2><span class="pair-total" id="pair-total">8 pairs</span></div><p>Rates show quote currency received for one unit of base.</p></div>
-              <label class="search-field">
-                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.6"/><path d="m13 13 4 4"/></svg>
-                <span class="sr-only">Search currencies</span>
-                <input id="search-input" type="search" placeholder="Find a currency" autocomplete="off" />
-                <kbd>/</kbd>
-              </label>
-            </div>
+              <div class="board-toolbar">
+                <div class="board-title-group"><div class="section-title-row"><h2>Currency pairs</h2><span class="pair-total" id="pair-total">8 pairs</span></div><p>Rates show quote currency received for one unit of base.</p></div>
+                <div class="toolbar-tools">
+                  <label class="search-field">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.6"/><path d="m13 13 4 4"/></svg>
+                    <span class="sr-only">Search currencies</span>
+                    <input id="search-input" type="search" placeholder="Find a currency" autocomplete="off" />
+                    <kbd>/</kbd>
+                  </label>
+                  <button class="button button-secondary options-toggle" id="display-options-toggle" type="button" aria-expanded="false" aria-controls="display-options">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/><circle cx="7" cy="5" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="8" cy="15" r="2"/></svg>
+                    View options
+                  </button>
+                </div>
+              </div>
+
+              <section class="display-options" id="display-options" aria-label="Rates board display options" hidden>
+                <div class="display-options-heading">
+                  <div><span>BOARD CONTROLS</span><strong>Shape your view</strong></div>
+                  <button class="text-button" id="reset-display-options" type="button">Reset</button>
+                </div>
+                <div class="display-options-grid">
+                  <label>SHOW
+                    <select id="pair-filter">
+                      <option value="all">All currency pairs</option>
+                      <option value="needs-prices">Prices to complete</option>
+                      <option value="priced">Ready to quote</option>
+                      <option value="reference-issues">Stale or missing reference</option>
+                    </select>
+                  </label>
+                  <label>SORT BY
+                    <select id="pair-sort">
+                      <option value="board">Board order</option>
+                      <option value="code">Currency code A–Z</option>
+                      <option value="name">Currency name A–Z</option>
+                      <option value="rate-high">Reference rate: high to low</option>
+                      <option value="rate-low">Reference rate: low to high</option>
+                    </select>
+                  </label>
+                  <label>ROW SPACING
+                    <select id="board-density">
+                      <option value="comfortable">Comfortable</option>
+                      <option value="compact">Compact</option>
+                    </select>
+                  </label>
+                  <label>THEME
+                    <select id="board-theme">
+                      <option value="evergreen">Evergreen</option>
+                      <option value="night">Night desk</option>
+                    </select>
+                  </label>
+                </div>
+              </section>
 
             <div class="table-wrap">
               <table class="rates-table">
