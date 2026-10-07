@@ -85,7 +85,7 @@ function loadSettings() {
 }
 
 const settings = loadSettings();
-const savedView = readJson(VIEW_STORAGE_KEY, {});
+const savedView = readJson(VIEW_STORAGE_KEY, {}) ?? {};
 const view = {
   filter: ["all", "needs-prices", "priced", "reference-issues"].includes(savedView.filter) ? savedView.filter : DEFAULT_VIEW.filter,
   sort: ["board", "code", "name", "rate-high", "rate-low"].includes(savedView.sort) ? savedView.sort : DEFAULT_VIEW.sort,
@@ -260,7 +260,8 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
     if (view.filter === "priced" && !(prices.buy && prices.sell)) return false;
     if (view.filter === "reference-issues") {
       const rate = referenceRates[id];
-      if (rate && !isObservationStale(rate.date, new Date())) return false;
+      const hasReferenceIssue = !rate || isObservationStale(rate.date, new Date()) || rate.cacheFallback || ["stale-cache", "error"].includes(referenceMeta.cacheStatus);
+      if (!hasReferenceIssue) return false;
     }
     return true;
   });
