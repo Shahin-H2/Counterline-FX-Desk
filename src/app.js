@@ -4,6 +4,8 @@ import { isObservationStale } from "./domain/freshness.js";
 const STORAGE_KEY = "counterline-fx-prices-v1";
 const REFERENCE_CACHE_KEY = "counterline-fx-reference-cache-v1";
 const CURRENCY_CACHE_KEY = "counterline-fx-currencies-v1";
+const VIEW_STORAGE_KEY = "counterline-fx-view-v1";
+const DEFAULT_VIEW = { filter: "all", sort: "board", density: "comfortable", theme: "evergreen" };
 const DEFAULT_PAIRS = ["USD/EUR", "USD/CAD", "USD/MXN", "USD/GBP", "USD/TRY", "USD/INR", "USD/JPY", "USD/CHF"];
 const MAX_BOARD_PAIRS = 30;
 const MANUAL_RATE_PATTERN = /^\d+(?:\.\d{1,8})?$/;
@@ -21,6 +23,13 @@ const elements = {
   refreshButton: document.querySelector("#refresh-button"),
   searchInput: document.querySelector("#search-input"),
   emptySearch: document.querySelector("#empty-search"),
+  optionsToggle: document.querySelector("#display-options-toggle"),
+  displayOptions: document.querySelector("#display-options"),
+  pairFilter: document.querySelector("#pair-filter"),
+  pairSort: document.querySelector("#pair-sort"),
+  boardDensity: document.querySelector("#board-density"),
+  boardTheme: document.querySelector("#board-theme"),
+  resetDisplayOptions: document.querySelector("#reset-display-options"),
   pairDialog: document.querySelector("#pair-dialog"),
   pairForm: document.querySelector("#pair-form"),
   pairBase: document.querySelector("#pair-base"),
@@ -76,6 +85,13 @@ function loadSettings() {
 }
 
 const settings = loadSettings();
+const savedView = readJson(VIEW_STORAGE_KEY, {});
+const view = {
+  filter: ["all", "needs-prices", "priced", "reference-issues"].includes(savedView.filter) ? savedView.filter : DEFAULT_VIEW.filter,
+  sort: ["board", "code", "name", "rate-high", "rate-low"].includes(savedView.sort) ? savedView.sort : DEFAULT_VIEW.sort,
+  density: ["comfortable", "compact"].includes(savedView.density) ? savedView.density : DEFAULT_VIEW.density,
+  theme: ["evergreen", "night"].includes(savedView.theme) ? savedView.theme : DEFAULT_VIEW.theme,
+};
 let referenceRates = {};
 let referenceMeta = { cacheStatus: "loading", errors: [], retrievedAt: null, checkedAt: null };
 let currencies = [];
@@ -238,13 +254,44 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
   const visiblePairs = settings.pairs.filter((id) => {
     const { base, quote } = pairParts(id);
     const text = `${base} ${quote} ${currencyName(base)} ${currencyName(quote)}`.toLocaleLowerCase(locale);
-    return text.includes(normalizedSearch);
+    if (!text.includes(normalizedSearch)) return false;
+    const prices = settings.prices[id] ?? {};
+    if (view.filter === "needs-prices" && prices.buy && prices.sell) return false;
+    if (view.filter === "priced" && !(prices.buy && prices.sell)) return false;
+    if (view.filter === "reference-issues") {
+      const rate = referenceRates[id];
+      if (rate && !isObservationStale(rate.date, new Date())) return false;
+    }
+    return true;
   });
-  elements.emptySearch.hidden = visiblePairs.length > 0 || normalizedSearch.length === 0;
+  const sortedPairs = [...visiblePairs];
+  if (view.sort === "code") sortedPairs.sort((a, b) => a.localeCompare(b));
+  if (view.sort === "name") sortedPairs.sort((a, b) => {
+    const aParts = pairParts(a); const bParts = pairParts(b);
+    return `${currencyName(aParts.base)} ${currencyName(aParts.quote)}`.localeCompare(`${currencyName(bParts.base)} ${currencyName(bParts.quote)}`, locale);
+  });
+  if (view.sort === "rate-high" || view.sort === "rate-low") sortedPairs.sort((a, b) => {
+    const aRate = referenceRates[a]?.rate; const bRate = referenceRates[b]?.rate;
+    if (!aRate && !bRate) return 0;
+    if (!aRate) return 1;
+    if (!bRate) return -1;
+    const order = compareDecimals(aRate, bRate);
+    return view.sort === "rate-high" ? -order : order;
+  });
+  elements.emptySearch.hidden = sortedPairs.length > 0;
+  if (!sortedPairs.length) {
+    const title = elements.emptySearch.querySelector("strong");
+    const message = elements.emptySearch.querySelector("span");
+    if (title && message) {
+      const filtered = view.filter !== "all";
+      title.textContent = normalizedSearch ? "No pairs found" : "No pairs match these options";
+      message.textContent = normalizedSearch ? "Try another code, name, or board filter." : filtered ? "Adjust the filter or add prices to see more pairs." : "Try a currency code or name.";
+    }
+  }
   if (!visiblePairs.length) {
     elements.ratesBody.innerHTML = "";
   } else {
-    elements.ratesBody.innerHTML = visiblePairs.map((id, index) => {
+    elements.ratesBody.innerHTML = sortedPairs.map((id, index) => {
       const { base, quote } = pairParts(id);
       const rate = referenceRates[id];
       const pairPrices = settings.prices[id] ?? { buy: "", sell: "" };
@@ -382,6 +429,16 @@ function renderCalculator() {
   }
 }
 
+function applyViewPreferences({ persist = true } = {}) {
+  document.body.dataset.theme = view.theme;
+  document.body.dataset.density = view.density;
+  elements.pairFilter.value = view.filter;
+  elements.pairSort.value = view.sort;
+  elements.boardDensity.value = view.density;
+  elements.boardTheme.value = view.theme;
+  if (persist) writeJson(VIEW_STORAGE_KEY, view);
+}
+
 function openPairDialog() {
   if (settings.pairs.length >= MAX_BOARD_PAIRS) {
     announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`);
@@ -484,6 +541,22 @@ function initializeEvents() {
   document.querySelector("#first-price-button").addEventListener("click", () => openPriceDialog(settings.pairs[0]));
   elements.refreshButton.addEventListener("click", () => loadRates({ announceSuccess: true }));
   elements.searchInput.addEventListener("input", () => { searchTerm = elements.searchInput.value; renderTable(); });
+  elements.optionsToggle.addEventListener("click", () => {
+    const opening = elements.displayOptions.hidden;
+    elements.displayOptions.hidden = !opening;
+    elements.optionsToggle.setAttribute("aria-expanded", String(opening));
+    if (opening) elements.pairFilter.focus();
+  });
+  elements.pairFilter.addEventListener("change", () => { view.filter = elements.pairFilter.value; applyViewPreferences(); renderTable(); });
+  elements.pairSort.addEventListener("change", () => { view.sort = elements.pairSort.value; applyViewPreferences(); renderTable(); });
+  elements.boardDensity.addEventListener("change", () => { view.density = elements.boardDensity.value; applyViewPreferences(); });
+  elements.boardTheme.addEventListener("change", () => { view.theme = elements.boardTheme.value; applyViewPreferences(); });
+  elements.resetDisplayOptions.addEventListener("click", () => {
+    Object.assign(view, DEFAULT_VIEW);
+    applyViewPreferences();
+    renderTable();
+    announce("Board view options reset.");
+  });
   elements.pairBase.addEventListener("change", updatePairPreview);
   elements.pairQuote.addEventListener("change", updatePairPreview);
   elements.pairForm.addEventListener("submit", (event) => {
@@ -554,6 +627,7 @@ function initializeEvents() {
   });
 }
 
+applyViewPreferences({ persist: false });
 populateDate();
 initializeEvents();
 renderTable();
