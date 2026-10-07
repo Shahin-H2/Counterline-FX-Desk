@@ -217,6 +217,27 @@
           </aside>
         </section>
 
+        <section class="history-section" id="history" aria-labelledby="history-title">
+          <header class="history-header">
+            <div class="history-heading">
+              <div class="card-kicker">RATE MOVEMENT</div>
+              <h2 id="history-title">Currency pair history</h2>
+              <p>Explore daily reference rates for every pair on your board.</p>
+            </div>
+            <div class="history-controls" role="group" aria-label="Chart time range" aria-describedby="history-resolution-note">
+              <button class="history-range" type="button" disabled title="A 5-minute chart needs an intraday data source" aria-label="5 minutes, unavailable with daily reference data">5 min</button>
+              <button class="history-range" type="button" data-history-range="1d" aria-pressed="false">1 day</button>
+              <button class="history-range" type="button" data-history-range="1w" aria-pressed="false">1 week</button>
+              <button class="history-range" type="button" data-history-range="1m" aria-pressed="true">1 month</button>
+              <button class="history-range" type="button" data-history-range="3m" aria-pressed="false">3 months</button>
+              <button class="history-range" type="button" data-history-range="6m" aria-pressed="false">6 months</button>
+            </div>
+          </header>
+          <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span> The current source updates daily. Five-minute history needs a separate intraday feed; gaps can appear on weekends and holidays.</p>
+          <div class="history-status" id="history-status" role="status" aria-live="polite">Loading daily history…</div>
+          <div class="history-grid" id="history-grid" role="list" aria-label="Currency pair history charts"></div>
+        </section>
+
         <footer class="page-footer"><span>COUNTERLINE <span class="footer-divider">/</span> FX DESK</span><span>Reference data for operational context only.</span></footer>
       </main>
     </div>
