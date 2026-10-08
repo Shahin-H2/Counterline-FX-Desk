@@ -7,6 +7,11 @@ const CURRENCY_CACHE_KEY = "counterline-fx-currencies-v1";
 const VIEW_STORAGE_KEY = "counterline-fx-view-v1";
 const DEFAULT_VIEW = { filter: "all", sort: "board", density: "comfortable", theme: "evergreen" };
 const DEFAULT_PAIRS = ["USD/EUR", "USD/CAD", "USD/MXN", "USD/GBP", "USD/TRY", "USD/INR", "USD/JPY", "USD/CHF"];
+const METAL_ASSETS = [
+  { code: "XAU", name: "Gold (troy ounce)", symbol: "Au" },
+  { code: "XAG", name: "Silver (troy ounce)", symbol: "Ag" },
+];
+const METAL_CODES = new Set(METAL_ASSETS.map(({ code }) => code));
 const MAX_BOARD_PAIRS = 30;
 const MANUAL_RATE_PATTERN = /^\d+(?:\.\d{1,8})?$/;
 const locale = navigator.language || "en-US";
@@ -121,6 +126,37 @@ function currencyName(code) {
   return currencies.find((currency) => currency.code === code)?.name ?? code;
 }
 
+function currencyMark(code) {
+  return METAL_ASSETS.find((asset) => asset.code === code)?.symbol ?? code.slice(0, 2);
+}
+
+function isMetalPair(base, quote) {
+  return METAL_CODES.has(base) || METAL_CODES.has(quote);
+}
+
+function isSupportedPair(base, quote) {
+  if (!isMetalPair(base, quote)) return true;
+  return (METAL_CODES.has(base) && quote === "USD") || (base === "USD" && METAL_CODES.has(quote));
+}
+
+function metalPairUnit(base, quote) {
+  if (base === "USD" && quote === "XAU") return "Troy ounces of gold per USD";
+  if (base === "USD" && quote === "XAG") return "Troy ounces of silver per USD";
+  if (base === "XAU" && quote === "USD") return "USD per troy ounce of gold";
+  if (base === "XAG" && quote === "USD") return "USD per troy ounce of silver";
+  return "Gold and silver pairs use USD";
+}
+
+function ensureSpecialAssets(list) {
+  const next = list.filter((currency) => !METAL_CODES.has(currency.code));
+  if (!next.some((currency) => currency.code === "USD")) next.push({ code: "USD", name: "US Dollar", symbol: "$" });
+  if (!next.some((currency) => currency.code === "IRR")) next.push({ code: "IRR", name: "Iranian Rial", symbol: "﷼" });
+  for (const asset of METAL_ASSETS) {
+    if (!next.some((currency) => currency.code === asset.code)) next.push(asset);
+  }
+  return next;
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 }
@@ -135,6 +171,14 @@ function formatDate(dateString, options = { month: "short", day: "numeric", year
 function formatCheckedAt(value) {
   if (!value || Number.isNaN(new Date(value).getTime())) return "Check time unavailable";
   return new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(new Date(value));
+}
+
+function formatRateObservation(rate, dateOptions = { month: "short", day: "numeric", timeZone: "UTC" }) {
+  const options = { month: "short", day: "numeric", timeZone: "UTC", ...dateOptions };
+  if (rate?.observedAt && !Number.isNaN(new Date(rate.observedAt).getTime())) {
+    return new Intl.DateTimeFormat(locale, { ...options, hour: "numeric", minute: "2-digit" }).format(new Date(rate.observedAt));
+  }
+  return formatDate(rate?.date, options);
 }
 
 function formatPairRate(rate) {
@@ -240,6 +284,7 @@ async function loadPairHistory() {
 }
 
 function amountDigits(code) {
+  if (METAL_CODES.has(code)) return 8;
   try {
     const digits = new Intl.NumberFormat(locale, { style: "currency", currency: code }).resolvedOptions().maximumFractionDigits;
     return Number.isInteger(digits) && digits >= 0 && digits <= 8 ? digits : 2;
@@ -286,11 +331,12 @@ function updateFeedStatus() {
   const stalePairs = currentStalePairs();
   const missingPairs = settings.pairs.filter((id) => !referenceRates[id]);
   const hasErrors = referenceMeta.errors?.length > 0;
+  const metalProviderNeeded = referenceMeta.errors?.some((error) => error.code === "provider-not-configured");
   let label = "Live lookup";
   let state = "fresh";
 
   if (!ratesAvailable) {
-    label = referenceMeta.cacheStatus === "error" || hasErrors ? "Unavailable" : "Waiting";
+    label = metalProviderNeeded ? "Source needed" : referenceMeta.cacheStatus === "error" || hasErrors ? "Unavailable" : "Waiting";
     state = "error";
   } else if (referenceMeta.cacheStatus === "browser-cache-pending") {
     label = "Saved browser cache";
@@ -327,7 +373,9 @@ function updateFeedStatus() {
   let alertKind = "warning";
   if (!ratesAvailable) {
     alertKind = "error";
-    alertText = "Reference data is unavailable. Customer prices remain editable, but no reference values are being shown. Check the feed before relying on any rate.";
+    alertText = metalProviderNeeded
+      ? "Gold and silver rows are ready, but no metals data source is configured yet. Their reference prices will stay blank until a provider is selected."
+      : "Reference data is unavailable. Customer prices remain editable, but no reference values are being shown. Check the feed before relying on any rate.";
   } else if (referenceMeta.cacheStatus === "stale-cache") {
     alertText = `The reference provider could not be reached. Showing the last successful server cache from ${formatCheckedAt(referenceMeta.retrievedAt)}; each observation date remains attached to its pair.`;
   } else if (referenceMeta.cacheStatus === "browser-cache-pending") {
@@ -339,7 +387,9 @@ function updateFeedStatus() {
   } else if (stalePairs.length) {
     alertText = `One or more reference observations are more than ${3} calendar days old. Stale pairs are marked in the table; do not present them as current.`;
   } else if (hasErrors || missingPairs.length) {
-    alertText = `Partial reference coverage: ${missingPairs.length} pair${missingPairs.length === 1 ? " has" : "s have"} no returned rate. Missing rows are labeled individually.`;
+    alertText = metalProviderNeeded
+      ? `Currency references loaded, but ${missingPairs.length} gold/silver pair${missingPairs.length === 1 ? " is" : "s are"} still need a metals source. Missing rows are labeled individually.`
+      : `Partial reference coverage: ${missingPairs.length} pair${missingPairs.length === 1 ? " has" : "s have"} no returned rate. Missing rows are labeled individually.`;
   }
   elements.feedAlert.hidden = !alertText;
   elements.feedAlert.dataset.kind = alertKind;
@@ -413,12 +463,12 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
       const rowClasses = [animateRows || animatePair === id ? "row-enter" : "", highlightPair === id ? "row-highlight" : ""].filter(Boolean).join(" ");
       const stale = rate && (isObservationStale(rate.date, new Date()) || rate.cacheFallback || referenceMeta.cacheStatus === "stale-cache" || referenceMeta.cacheStatus === "error");
       const cached = rate && (rate.cacheFallback || referenceMeta.cacheStatus === "stale-cache" || referenceMeta.cacheStatus === "error" || referenceMeta.cacheStatus === "browser-cache-pending");
-      const refDate = rate ? formatDate(rate.date, { month: "short", day: "numeric" }) : "—";
+      const refDate = rate ? formatRateObservation(rate, { month: "short", day: "numeric" }) : "—";
       const refValue = rate
         ? `<div class="reference-value ${stale ? "is-stale" : ""}"><strong>${escapeHtml(formatPairRate(rate.rate))} <small>${escapeHtml(quote)}</small></strong><small>1 ${escapeHtml(base)} · ${escapeHtml(refDate)}${cached ? " · CACHED" : stale ? " · STALE" : ""}</small></div>`
-        : `<div class="reference-value is-missing"><strong>${referenceMeta.cacheStatus === "loading" ? "Loading…" : "No source rate"}</strong><small>${referenceMeta.cacheStatus === "loading" ? "" : "Coverage unavailable"}</small></div>`;
+        : `<div class="reference-value is-missing"><strong>${referenceMeta.cacheStatus === "loading" ? "Loading…" : isMetalPair(base, quote) ? "Metal source needed" : "No source rate"}</strong><small>${referenceMeta.cacheStatus === "loading" ? "" : !isSupportedPair(base, quote) ? "Use USD with gold or silver" : isMetalPair(base, quote) ? "Troy ounce · USD reference" : "Coverage unavailable"}</small></div>`;
       return `<tr class="${rowClasses}" style="--row-delay:${Math.min(index, 6) * 45}ms" data-pair="${escapeHtml(id)}">
-        <td><div class="pair-cell"><span class="currency-chip">${escapeHtml(base.slice(0, 2))}</span><div class="pair-names"><strong>${escapeHtml(base)} <span aria-hidden="true">→</span> ${escapeHtml(quote)}</strong><small>${escapeHtml(currencyName(base))} / ${escapeHtml(currencyName(quote))}</small></div></div></td>
+        <td><div class="pair-cell"><span class="currency-chip">${escapeHtml(currencyMark(base))}</span><div class="pair-names"><strong>${escapeHtml(base)} <span aria-hidden="true">→</span> ${escapeHtml(quote)}</strong><small>${escapeHtml(currencyName(base))} / ${escapeHtml(currencyName(quote))}</small></div></div></td>
         <td>${refValue}</td>
         <td><div class="customer-price">${priceText(pairPrices.buy, quote)}<button class="edit-price-button" type="button" data-edit-price="${escapeHtml(id)}" aria-label="${pairPrices.buy ? "Edit" : "Set"} desk buy price for ${escapeHtml(id)}">${pairPrices.buy ? "Edit" : "Set rate"}</button></div></td>
         <td><div class="customer-price">${priceText(pairPrices.sell, quote, "sell-price")}<button class="edit-price-button" type="button" data-edit-price="${escapeHtml(id)}" aria-label="${pairPrices.sell ? "Edit" : "Set"} desk sell price for ${escapeHtml(id)}">${pairPrices.sell ? "Edit" : "Set rate"}</button></div></td>
@@ -455,21 +505,16 @@ async function loadCurrencies() {
     const body = await response.json();
     if (!Array.isArray(body.currencies)) throw new Error("Unexpected currency list");
     currencies = body.currencies.filter((item) => /^[A-Z]{3}$/.test(item.code) && typeof item.name === "string");
-    currencies = ensureIranianRial(currencies);
+    currencies = ensureSpecialAssets(currencies);
     writeJson(CURRENCY_CACHE_KEY, currencies);
   } catch {
     const cached = readJson(CURRENCY_CACHE_KEY, []);
     if (Array.isArray(cached)) currencies = cached.filter((item) => item && /^[A-Z]{3}$/.test(item.code) && typeof item.name === "string");
-    currencies = ensureIranianRial(currencies);
+    currencies = ensureSpecialAssets(currencies);
   }
-  renderCalculatorOptions();
+  renderTable();
   const selectedPair = currentCalculatorPair();
   if (!settings.pairs.includes(selectedPair)) refreshCalculatorReference(selectedPair);
-}
-
-function ensureIranianRial(list) {
-  if (list.some((currency) => currency.code === "IRR")) return list;
-  return [...list, { code: "IRR", name: "Iranian Rial", symbol: "﷼" }];
 }
 
 async function loadRates({ announceSuccess = false } = {}) {
@@ -537,7 +582,9 @@ function renderCalculatorOptions() {
       if (!options.some((currency) => currency.code === code)) options.push({ code, name: code });
     }
   }
-  if (!options.some((currency) => currency.code === "IRR")) options.push({ code: "IRR", name: "Iranian Rial", symbol: "﷼" });
+  for (const currency of ensureSpecialAssets([])) {
+    if (!options.some((option) => option.code === currency.code)) options.push(currency);
+  }
   options.sort((a, b) => a.code.localeCompare(b.code));
   const markup = options.map(({ code, name }) => `<option value="${escapeHtml(code)}">${escapeHtml(code)} · ${escapeHtml(name)}</option>`).join("");
   elements.calculatorBase.innerHTML = markup;
@@ -571,13 +618,15 @@ function renderCalculator() {
     return;
   }
   const { base, quote } = pairParts(id);
+  const metalPair = isMetalPair(base, quote);
+  const metalDirectionSupported = isSupportedPair(base, quote);
   const amount = elements.calculatorAmount.value || "0";
   const onBoard = settings.pairs.includes(id);
   const rate = referenceRates[id];
   const prices = settings.prices[id] ?? {};
   const amountValue = parseDecimal(amount);
   elements.calculatorBaseCode.textContent = base;
-  const referenceResult = rate && amountValue && amountValue.coefficient > 0n
+  const referenceResult = metalDirectionSupported && rate && amountValue && amountValue.coefficient > 0n
     ? multiplyAndRound(amount, rate.rate, amountDigits(quote))
     : null;
   const lookupState = calculatorLookupState.get(id);
@@ -585,15 +634,15 @@ function renderCalculator() {
     ? `${formatDecimal(referenceResult, locale, amountDigits(quote), amountDigits(quote))} ${quote}`
     : !amountValue || amountValue.coefficient <= 0n
       ? "Enter an amount"
-      : lookupState === "loading" ? "Looking up reference…" : "Reference rate unavailable";
+      : !metalDirectionSupported ? "Use USD with gold or silver" : lookupState === "loading" ? "Looking up reference…" : "Reference rate unavailable";
   if (rate) {
     const stale = isObservationStale(rate.date, new Date()) || rate.cacheFallback || (onBoard && ["stale-cache", "error"].includes(referenceMeta.cacheStatus));
     const cached = rate.cacheFallback || lookupState === "cached" || (onBoard && ["cached", "stale-cache", "error", "browser-cache-pending"].includes(referenceMeta.cacheStatus));
-    elements.calculatorReferenceMeta.textContent = `Frankfurter daily reference · ${formatDate(rate.date)}${stale ? " · STALE" : cached ? " · CACHED" : ""} · not a customer quote`;
+    elements.calculatorReferenceMeta.textContent = `${rate.source ?? (metalPair ? "Metal reference" : "Frankfurter daily reference")} · ${formatRateObservation(rate)}${stale ? " · STALE" : cached ? " · CACHED" : ""} · not a customer quote`;
   } else {
     elements.calculatorReferenceMeta.textContent = lookupState === "error" || lookupState === "missing"
-      ? "No Frankfurter observation is available for this pair."
-      : "Frankfurter daily reference · not a customer quote";
+      ? metalPair ? "Gold and silver quotes need a metals data source." : "No Frankfurter observation is available for this pair."
+      : metalPair ? `Pair convention: ${metalPairUnit(base, quote)}; metals feed not configured.` : "Frankfurter daily reference · not a customer quote";
   }
   for (const [side, output] of [["buy", elements.calculatorBuyResult], ["sell", elements.calculatorSellResult]]) {
     const rate = prices[side];
@@ -607,6 +656,12 @@ function renderCalculator() {
 
 function refreshCalculatorReference(id, { force = false } = {}) {
   if (!id || (!force && calculatorLookupState.has(id))) return;
+  const { base, quote } = pairParts(id);
+  if (!isSupportedPair(base, quote)) {
+    calculatorLookupState.set(id, "missing");
+    renderCalculator();
+    return;
+  }
   calculatorLookupState.set(id, "loading");
   renderCalculator();
   const pair = pairParts(id);
@@ -654,6 +709,11 @@ function changeCalculatorCurrencies(changed) {
 function addCalculatorPairToBoard() {
   const id = currentCalculatorPair();
   if (!id || settings.pairs.includes(id)) return;
+  const { base, quote } = pairParts(id);
+  if (!isSupportedPair(base, quote)) {
+    announce("Gold and silver pairs can only be added against USD.");
+    return;
+  }
   if (settings.pairs.length >= MAX_BOARD_PAIRS) {
     announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`);
     return;
@@ -663,7 +723,9 @@ function addCalculatorPairToBoard() {
   renderTable({ animatePair: id, highlightPair: id });
   loadRates();
   loadPairHistory();
-  announce(saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
+  announce(isMetalPair(base, quote)
+    ? `${id} added. The reference quote will appear after a metals source is configured.`
+    : saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
 }
 
 function reorderPair(sourceId, targetId, afterTarget = false, { restoreFocus = true } = {}) {
@@ -731,8 +793,12 @@ function openPairDialog() {
     announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`);
     return;
   }
-  const available = currencies.length ? currencies : [];
-  const optionMarkup = available.map(({ code, name }) => `<option value="${escapeHtml(code)}">${escapeHtml(code)} · ${escapeHtml(name)}</option>`).join("");
+  const available = ensureSpecialAssets(currencies);
+  const currenciesMarkup = available.filter(({ code }) => !METAL_CODES.has(code))
+    .map(({ code, name }) => `<option value="${escapeHtml(code)}">${escapeHtml(code)} · ${escapeHtml(name)}</option>`).join("");
+  const metalsMarkup = available.filter(({ code }) => METAL_CODES.has(code))
+    .map(({ code, name }) => `<option value="${escapeHtml(code)}">${escapeHtml(code)} · ${escapeHtml(name)}</option>`).join("");
+  const optionMarkup = `<optgroup label="Currencies">${currenciesMarkup}</optgroup><optgroup label="Precious metals">${metalsMarkup}</optgroup>`;
   elements.pairBase.innerHTML = optionMarkup;
   elements.pairQuote.innerHTML = optionMarkup;
   const preferredBase = available.some((currency) => currency.code === "USD") ? "USD" : available[0]?.code;
@@ -759,7 +825,17 @@ function updatePairPreview() {
   const id = `${base}/${quote}`;
   const exists = settings.pairs.includes(id);
   const same = base === quote;
-  elements.pairPreview.innerHTML = `<span>PAIR PREVIEW</span><strong>${escapeHtml(base || "—")} → ${escapeHtml(quote || "—")}</strong><small>${same ? "Choose two different currencies." : exists ? "This pair is already on the board." : "Reference rate will be loaded after adding."}</small>`;
+  const unsupported = !isSupportedPair(base, quote);
+  const detail = same
+    ? "Choose two different currencies."
+    : unsupported
+      ? "Gold and silver can only be quoted against USD."
+      : exists
+        ? "This pair is already on the board."
+        : isMetalPair(base, quote)
+          ? `${metalPairUnit(base, quote)}. A metals source is required for the quote.`
+          : "Reference rate will be loaded after adding.";
+  elements.pairPreview.innerHTML = `<span>PAIR PREVIEW</span><strong>${escapeHtml(base || "—")} → ${escapeHtml(quote || "—")}</strong><small>${escapeHtml(detail)}</small>`;
 }
 
 function openPriceDialog(id) {
@@ -774,7 +850,9 @@ function openPriceDialog(id) {
   elements.priceSell.value = prices.sell ?? "";
   document.querySelectorAll(".price-quote-code").forEach((node) => { node.textContent = quote; });
   elements.priceReferenceRate.textContent = reference ? `1 ${base} = ${formatPairRate(reference.rate)} ${quote}` : "No reference rate available";
-  elements.priceReferenceDate.textContent = reference ? `Frankfurter blended reference · ${formatDate(reference.date)}` : "Reference data is not a customer price";
+  elements.priceReferenceDate.textContent = reference
+    ? `${reference.source ?? (isMetalPair(base, quote) ? "Metal reference" : "Frankfurter blended reference")} · ${formatRateObservation(reference)}`
+    : isMetalPair(base, quote) ? "A metals data source is needed for this reference quote" : "Reference data is not a customer price";
   elements.priceValidation.hidden = true;
   elements.priceValidation.textContent = "";
   elements.priceDialog.showModal();
@@ -897,7 +975,7 @@ function initializeEvents() {
     const base = elements.pairBase.value;
     const quote = elements.pairQuote.value;
     const id = `${base}/${quote}`;
-    if (base === quote || settings.pairs.includes(id)) {
+    if (base === quote || !isSupportedPair(base, quote) || settings.pairs.includes(id)) {
       updatePairPreview();
       return;
     }
@@ -909,7 +987,9 @@ function initializeEvents() {
     renderCalculatorOptions();
     loadRates();
     loadPairHistory();
-    announce(saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
+    announce(isMetalPair(base, quote)
+      ? `${id} added. The reference quote will appear after a metals source is configured.`
+      : saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
   });
   elements.priceForm.addEventListener("submit", handlePriceSave);
   document.querySelector("#clear-price-button").addEventListener("click", () => {
