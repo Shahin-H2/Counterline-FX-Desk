@@ -72,7 +72,26 @@ const server = createServer(async (request, response) => {
       return;
     }
     try {
-      sendJson(response, 200, await referenceService.getRates(pairs));
+      const metalPairs = pairs.filter(({ base, quote }) => base === "XAU" || base === "XAG" || quote === "XAU" || quote === "XAG");
+      const currencyPairs = pairs.filter(({ base, quote }) => ![base, quote].some((code) => code === "XAU" || code === "XAG"));
+      const supportedMetalPairs = metalPairs.filter(({ base, quote }) =>
+        ((base === "XAU" || base === "XAG") && quote === "USD") ||
+        (base === "USD" && (quote === "XAU" || quote === "XAG")));
+      const unsupportedMetalPairs = metalPairs.filter((pair) => !supportedMetalPairs.includes(pair));
+      const currencyPayload = currencyPairs.length ? await referenceService.getRates(currencyPairs) : null;
+      const rates = { ...(currencyPayload?.rates ?? {}) };
+      const errors = [...(currencyPayload?.errors ?? [])];
+      if (supportedMetalPairs.length) errors.push({ code: "provider-not-configured", message: "Gold and silver reference rates need a metals data source." });
+      if (unsupportedMetalPairs.length) errors.push({ code: "unsupported-metal-pair", message: "Gold and silver are currently supported against USD only." });
+      sendJson(response, 200, {
+        source: currencyPayload?.source ?? "Metals data source not configured",
+        retrievedAt: currencyPayload?.retrievedAt ?? null,
+        checkedAt: currencyPayload?.checkedAt ?? new Date().toISOString(),
+        rates,
+        errors,
+        fallbackPairs: currencyPayload?.fallbackPairs ?? [],
+        cacheStatus: currencyPayload?.cacheStatus === "stale-cache" ? "stale-cache" : errors.length ? "partial" : currencyPayload?.cacheStatus ?? "fresh",
+      });
     } catch {
       sendJson(response, 503, { error: "Reference data is unavailable. Try again shortly." });
     }
@@ -95,7 +114,13 @@ const server = createServer(async (request, response) => {
       return;
     }
     try {
-      const payload = await fetchFrankfurterHistory(pairs, { from, to });
+      const metalPairs = pairs.filter(({ base, quote }) => base === "XAU" || base === "XAG" || quote === "XAU" || quote === "XAG");
+      const currencyPairs = pairs.filter(({ base, quote }) => ![base, quote].some((code) => code === "XAU" || code === "XAG"));
+      const payload = currencyPairs.length
+        ? await fetchFrankfurterHistory(currencyPairs, { from, to })
+        : { source: "Metals history not configured", from, to, rates: {}, errors: [] };
+      for (const { base, quote } of metalPairs) payload.rates[`${base}/${quote}`] = [];
+      if (metalPairs.length) payload.errors.push({ message: "Gold and silver history needs a metals data source." });
       if (Object.values(payload.rates).some((observations) => observations.length)) {
         historyCache.set(key, { payload, expiresAt: now + 15 * 60 * 1000 });
       }
