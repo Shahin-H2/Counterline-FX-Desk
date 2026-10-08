@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#132b2c" />
-    <meta name="description" content="A clear currency reference and customer pricing board for exchange counters." />
-    <title>Counterline — FX Desk</title>
+    <meta name="description" content="A clear market watch for currency references, exchange prices and commodity benchmarks." />
+    <title>Counterline — Market watch</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
@@ -35,6 +35,10 @@
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 16.5h14M3.5 16V4"/><path d="m5.5 13 3.2-3.5 2.6 2.1L16 6.5M12.8 6.5H16v3.2"/></svg>
             <span>Rate charts</span>
           </a>
+          <a class="nav-item" href="#markets" aria-label="Commodity market rates" title="Jump to commodity markets">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 17 6.4v7.2L10 17.5l-7-3.9V6.4L10 2.5Z"/><path d="m3.2 6.5 6.8 4 6.8-4M10 10.5v7"/></svg>
+            <span>Markets</span>
+          </a>
         </nav>
 
         <div class="sidebar-spacer"></div>
@@ -51,7 +55,7 @@
 
       <main id="top" class="main-content">
         <header class="topbar">
-          <div class="breadcrumb"><span>Workspace</span><span class="crumb-divider">/</span><strong>Rates board</strong></div>
+          <div class="breadcrumb"><span>Workspace</span><span class="crumb-divider">/</span><strong>Market watch</strong></div>
           <div class="topbar-right">
             <span class="local-label"><span class="pulse-dot" aria-hidden="true"></span> LOCAL MODE</span>
             <span class="topbar-date" id="today-label"></span>
@@ -60,9 +64,9 @@
 
         <section id="rates" class="page-heading">
           <div>
-            <div class="eyebrow">EXCHANGE OPERATIONS <span>·</span> COUNTER 01</div>
-            <h1>Rates board<span class="heading-period">.</span></h1>
-            <p class="page-subtitle">Your reference market and customer prices, in one clear view.</p>
+            <div class="eyebrow">CURRENCY <span>·</span> COMMODITY MARKETS</div>
+            <h1>Market watch<span class="heading-period">.</span></h1>
+            <p class="page-subtitle">Indicative reference rates, with the source and observation date in view.</p>
           </div>
           <div class="heading-actions">
             <button class="button button-secondary" id="refresh-button" type="button">
@@ -240,6 +244,70 @@
           <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span> The current source updates daily. Five-minute history needs a separate intraday feed; gaps can appear on weekends and holidays.</p>
           <div class="history-status" id="history-status" role="status" aria-live="polite">Loading daily history…</div>
           <div class="history-grid" id="history-grid" role="list" aria-label="Currency pair history charts"></div>
+        </section>
+
+        <section class="markets-section" id="markets" aria-labelledby="markets-title">
+          <header class="markets-header">
+            <div class="markets-heading">
+              <div class="card-kicker">METALS <span>·</span> ENERGY <span>·</span> MATERIALS</div>
+              <h2 id="markets-title">Markets beyond currencies</h2>
+              <p>Indicative benchmarks with the unit, source and observation time kept in view.</p>
+            </div>
+            <div class="markets-update" id="markets-status" role="status" aria-live="polite">
+              <span class="market-live-dot" aria-hidden="true"></span>
+              <span>Quote feeds need to be selected</span>
+            </div>
+          </header>
+
+          <div class="markets-grid" id="markets-grid" role="list" aria-label="Commodity reference rates">
+            <article class="market-card market-card-gold" role="listitem">
+              <div class="market-card-top"><span class="market-symbol">Au</span><span class="market-kind">PRECIOUS METAL</span></div>
+              <div class="market-card-name"><h3>Gold</h3><span>XAU</span></div>
+              <div class="market-value">—</div>
+              <div class="market-unit">USD <span>·</span> per troy ounce</div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Waiting for source</span><span class="market-observation">No quote yet</span></div>
+            </article>
+            <article class="market-card market-card-silver" role="listitem">
+              <div class="market-card-top"><span class="market-symbol">Ag</span><span class="market-kind">PRECIOUS METAL</span></div>
+              <div class="market-card-name"><h3>Silver</h3><span>XAG</span></div>
+              <div class="market-value">—</div>
+              <div class="market-unit">USD <span>·</span> per troy ounce</div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Waiting for source</span><span class="market-observation">No quote yet</span></div>
+            </article>
+            <article class="market-card market-card-platinum" role="listitem">
+              <div class="market-card-top"><span class="market-symbol">Pt</span><span class="market-kind">PRECIOUS METAL</span></div>
+              <div class="market-card-name"><h3>Platinum</h3><span>XPT</span></div>
+              <div class="market-value">—</div>
+              <div class="market-unit">USD <span>·</span> per troy ounce</div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Waiting for source</span><span class="market-observation">No quote yet</span></div>
+            </article>
+            <article class="market-card market-card-oil" role="listitem">
+              <div class="market-card-top"><span class="market-symbol">WTI</span><span class="market-kind">ENERGY</span></div>
+              <div class="market-card-name"><h3>Crude oil</h3><span>WTI spot</span></div>
+              <div class="market-value">—</div>
+              <div class="market-unit">USD <span>·</span> per barrel</div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Daily benchmark</span><span class="market-observation">No quote yet</span></div>
+            </article>
+            <article class="market-card market-card-brent" role="listitem">
+              <div class="market-card-top"><span class="market-symbol">BRENT</span><span class="market-kind">ENERGY</span></div>
+              <div class="market-card-name"><h3>Brent crude</h3><span>North Sea</span></div>
+              <div class="market-value">—</div>
+              <div class="market-unit">USD <span>·</span> per barrel</div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Daily benchmark</span><span class="market-observation">No quote yet</span></div>
+            </article>
+            <article class="market-card market-card-diamond" role="listitem">
+              <div class="market-card-top"><span class="market-symbol">◇</span><span class="market-kind">GEMSTONE</span></div>
+              <div class="market-card-name"><h3>Diamond</h3><span>Grade-specific</span></div>
+              <div class="diamond-explainer">No single spot rate</div>
+              <div class="diamond-detail">Value depends on carat, cut, colour, clarity and whether it is natural or lab-grown.</div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Benchmark required</span><span class="market-observation">No universal quote</span></div>
+            </article>
+          </div>
+
+          <footer class="markets-footnote">
+            <span class="markets-footnote-mark" aria-hidden="true">i</span>
+            <p>These are reference-market ideas, not counter offers. Metals and oil need separate data providers. Diamond prices depend on a specification and a licensed benchmark.</p>
+          </footer>
         </section>
 
         <footer class="page-footer"><span>COUNTERLINE <span class="footer-divider">/</span> FX DESK</span><span>Reference data for operational context only.</span></footer>
