@@ -24,6 +24,9 @@ npm test
 - Pair rows can be reordered by dragging the grip or using the accessible earlier/later buttons. The reverse-direction action changes that row in place; customer prices stay attached to their original pair direction and are never reciprocated automatically.
 - The UI labels the reference source, shows the observation date per pair and the last check time, and marks an observation stale after it is more than three calendar days old. The local server caches successful rate responses for 10 minutes. If a later fetch fails, it returns its last successful server cache with an explicit stale-cache state. The browser also retains the last response to identify a display during a server outage.
 - The history section plots each board pair from daily observations over one day, one week, one month, three months, or six months. The five-minute control is unavailable because Frankfurter does not provide intraday history; an intraday provider is needed for that resolution. Daily observations can have gaps on weekends and holidays, and unsupported currency pairs are marked individually.
+- Gold (XAU) and silver (XAG) can be added to the pair board and calculator against USD. Units are troy ounces per USD for USD/XAU or USD/XAG, and USD per troy ounce for the reversed direction. They are not Frankfurter currencies, so those reference rows stay blank until a metals data provider is selected and configured; the FX feed continues to load independently.
+- Oil has an official EIA daily WTI/Brent spot series in USD per barrel. EIA's API needs a free registered key; its bulk download facility does not. EIA data is public domain and should carry a source acknowledgment. GoldAPI.io is a replaceable metals candidate for XAU/XAG (and XPT/XPD); its sandbox allows 100 requests/month and its unlimited plan is listed at $99/month. Its terms permit in-app display under the subscription terms, but describe all feed values as indicative and provide no accuracy or uptime guarantee. No commodity provider or credential is selected in this project yet.
+- A diamond card stays informational until a benchmark is selected. Rapaport's list is updated weekly, uses graded diamond specifications, and requires custom licensing for external website/software display; it is not a universal per-carat spot rate.
 - Desk prices are manual customer buy/sell quotes, stored in this browser's `localStorage`. A buy quote cannot exceed its sell quote. The quick calculator can switch between available base and quote currencies, including Iranian Rial (IRR), and shows a separately labeled indicative reference conversion. When that exact pair is on the board, it also shows the customer buy/sell payout. Calculations use decimal-safe integer arithmetic and round half up to the quote currency's minor unit. Fees are not modeled.
 - A Frankfurter/central-bank reference observation is not an executable customer quote. Frankfurter says its API and rates are supplied without warranty, rates can be late, missing or revised, and underlying source terms apply. Some underlying sources discourage transaction use. Review source-specific terms and obtain any rights needed for public/commercial display before operating this as a customer-facing product.
 
@@ -38,6 +41,12 @@ Useful primary documentation:
 - [Frankfurter overview](https://frankfurter.dev/)
 - [Frankfurter license and provider terms](https://frankfurter.dev/license/)
 - [Frankfurter API reference](https://api.frankfurter.dev/v2/openapi.json)
+- [EIA WTI and Brent daily spot prices](https://www.eia.gov/dnav/pet/PET_PRI_SPT_S1_D.htm)
+- [EIA API documentation and key registration](https://www.eia.gov/opendata/documentation.php)
+- [EIA copyrights and reuse](https://www.eia.gov/about/copyrights_reuse.php)
+- [GoldAPI.io plans and supported metals](https://www.goldapi.io/price/XAU/USD/free)
+- [GoldAPI.io end-user data terms](https://www.goldapi.io/kb/tos)
+- [Rapaport Diamond Price List and licensing](https://rapaport.com/diamond-price-list/)
 - [Open Exchange Rates plans](https://openexchangerates.org/signup)
 - [Open Exchange Rates API authentication](https://docs.openexchangerates.org/reference/authentication)
 - [ECB rate timing and transaction-use notice](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html)
