@@ -744,49 +744,49 @@ function changeCalculatorCurrencies(changed) {
     else elements.calculatorBase.value = alternate ?? "";
   } // If the user selects the same currency for both base and quote, automatically switch the other selector to a different available currency.
   previousCalculatorSelection = { base: elements.calculatorBase.value, quote: elements.calculatorQuote.value };
-  const id = currentCalculatorPair();
-  renderCalculator();
-  refreshCalculatorReference(id);
+  const id = currentCalculatorPair(); // Get the currently selected calculator pair as a string in the format "BASE/QUOTE". If the selection is invalid (e.g., base and quote are the same), exit the function early to prevent further processing.
+  renderCalculator(); // Re-render the calculator results based on the updated base and quote currencies, ensuring that the displayed results reflect the current selection.
+  refreshCalculatorReference(id); // Refresh the reference rate for the currently selected calculator pair, fetching it from the server if it is not already cached or if a forced refresh is requested. This ensures that the calculator displays up-to-date reference rates for the selected pair.
 }
 
 // Add the currently selected calculator pair to the rates board, validating that it is a supported pair and that the board has not reached its maximum capacity. If the pair is successfully added, save the settings and update the UI accordingly.
 function addCalculatorPairToBoard() {
-  const id = currentCalculatorPair();
-  if (!id || settings.pairs.includes(id)) return;
-  const { base, quote } = pairParts(id);
+  const id = currentCalculatorPair(); // Get the currently selected calculator pair as a string in the format "BASE/QUOTE". If the selection is invalid (e.g., base and quote are the same), exit the function early to prevent adding an invalid pair to the board.
+  if (!id || settings.pairs.includes(id)) return; // If the selected pair is invalid or already exists on the board, exit the function early to prevent adding a duplicate or invalid pair.
+  const { base, quote } = pairParts(id);    // Extract the base and quote currencies from the selected pair for validation purposes.
   if (!isSupportedPair(base, quote)) {
-    announce("Gold and silver pairs can only be added against USD.");
+    announce("Gold and silver pairs can only be added against USD."); // Announce an error message if the selected pair is not supported.
     return;
   } // Validate that the selected pair is supported (e.g., gold and silver must be paired with USD) before adding it to the board.
   if (settings.pairs.length >= MAX_BOARD_PAIRS) {
-    announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`);
+    announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`);  // Check if the board has reached its maximum capacity before adding the new pair, and announce a message if it has.
     return;
   } // Check if the board has reached its maximum capacity before adding the new pair.
-  settings.pairs.push(id);
-  const saved = saveSettings();
-  renderTable({ animatePair: id, highlightPair: id });
-  loadRates();
-  loadPairHistory();
+  settings.pairs.push(id);  // Add the new pair to the end of the settings.pairs array, which represents the current order of pairs on the board.
+  const saved = saveSettings(); // Save the updated settings to localStorage, returning a boolean indicating whether the save was successful.
+  renderTable({ animatePair: id, highlightPair: id });  // Re-render the table to include the newly added pair, highlighting it for visibility and animating its entry into the board.
+  loadRates();  // Fetch the latest reference rates for the newly added pair, ensuring that the board displays up-to-date information for all pairs, including the one just added.
+  loadPairHistory();  // Refresh the pair history to include the newly added pair, ensuring that the history is up-to-date and reflects the current state of the board.
   announce(isMetalPair(base, quote)
     ? `${id} added. The reference quote will appear after a metals source is configured.`
     : saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
 }
 // Reorder a currency pair on the board by moving it before or after another specified pair. This function updates the settings, applies view preferences, saves the changes, and re-renders the table. It also manages focus restoration for accessibility.
 function reorderPair(sourceId, targetId, afterTarget = false, { restoreFocus = true } = {}) {
-  if (sourceId === targetId) return;
-  const sourceIndex = settings.pairs.indexOf(sourceId);
-  if (sourceIndex < 0 || !settings.pairs.includes(targetId)) return;
-  const [source] = settings.pairs.splice(sourceIndex, 1);
-  let targetIndex = settings.pairs.indexOf(targetId);
-  if (afterTarget) targetIndex += 1;
-  settings.pairs.splice(targetIndex, 0, source);
-  view.sort = "board";
-  applyViewPreferences();
-  const saved = saveSettings();
-  renderTable();
+  if (sourceId === targetId) return;  // If the source and target pairs are the same, exit the function early to prevent unnecessary reordering.
+  const sourceIndex = settings.pairs.indexOf(sourceId); // Find the index of the source pair in the settings.pairs array. If the source pair is not found, exit the function early to prevent invalid reordering.
+  if (sourceIndex < 0 || !settings.pairs.includes(targetId)) return;  // If the source pair is not found or the target pair is not in the current settings, exit the function early to prevent invalid reordering.
+  const [source] = settings.pairs.splice(sourceIndex, 1); // Remove the source pair from its current position in the settings.pairs array, storing it in a variable for later insertion at the new position.
+  let targetIndex = settings.pairs.indexOf(targetId); // Find the index of the target pair in the settings.pairs array. If the target pair is not found, exit the function early to prevent invalid reordering.
+  if (afterTarget) targetIndex += 1;    // If the afterTarget flag is true, increment the target index to insert the source pair after the target pair; otherwise, it will be inserted before the target pair.
+  settings.pairs.splice(targetIndex, 0, source);  // Move the source pair to the new position in the settings.pairs array, either before or after the target pair based on the afterTarget flag.
+  view.sort = "board";    // Set the view sort order to "board" to reflect the new order of currency pairs after reordering.
+  applyViewPreferences();   // Apply the current view preferences to the document body and relevant UI elements, ensuring that the sort order is set to "board" to reflect the new order of currency pairs after reordering.
+  const saved = saveSettings();   // Save the updated settings to localStorage, returning a boolean indicating whether the save was successful.
+  renderTable();      // Re-render the table to reflect the new order of currency pairs after reordering.
   if (restoreFocus) {
     const controls = [...elements.ratesBody.querySelectorAll("[data-move-pair]")].filter((button) => button.dataset.movePair === sourceId);
-    (controls.find((button) => !button.disabled) ?? controls[0])?.focus();
+    (controls.find((button) => !button.disabled) ?? controls[0])?.focus();  // Restore focus to the first available move control for the moved pair, prioritizing enabled buttons for accessibility.
   }
   announce(saved ? "Currency pair order saved." : "Currency pair order changed for this session; browser storage is unavailable.");
 }
@@ -1102,28 +1102,28 @@ function initializeEvents() {
     draggedPairId = handle.dataset.dragPair;  // Store the ID of the dragged currency pair in a variable for later use during the drag-and-drop operation.
     event.dataTransfer.effectAllowed = "move";  // Set the allowed effect for the drag operation to "move", indicating that the dragged item can be moved to a new location.
     event.dataTransfer.setData("text/plain", draggedPairId);  // Set the data being transferred during the drag operation to the ID of the dragged currency pair, allowing it to be accessed during the drop event.
-    handle.closest("tr")?.classList.add("is-dragging");       // Add a visual feedback class to the closest table row of the dragged element to indicate that it is currently being dragged.
+    handle.closest("tr")?.classList.add("is-dragging"); // Add a visual feedback class to the closest table row of the dragged element to indicate that it is currently being dragged.
   }); // Handle the start of a drag operation on a currency pair row, storing the dragged pair ID and applying visual feedback to indicate that the row is being dragged.
   elements.ratesBody.addEventListener("dragover", (event) => {
-    if (!draggedPairId) return;
-    const targetRow = event.target.closest("tr[data-pair]");
-    if (!targetRow || targetRow.dataset.pair === draggedPairId) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
+    if (!draggedPairId) return;   // If there is no dragged pair ID, exit the function early to prevent any further processing of the dragover event.
+    const targetRow = event.target.closest("tr[data-pair]");  // Find the closest table row element that has a "data-pair" attribute, which represents the target currency pair for the dragover operation.
+    if (!targetRow || targetRow.dataset.pair === draggedPairId) return; // If there is no valid target row or if the target row is the same as the dragged pair, exit the function early to prevent any further processing of the dragover event.
+    event.preventDefault();   // Prevent the default behavior of the dragover event to allow for custom handling of the drag-and-drop operation, enabling the drop effect to be applied.
+    event.dataTransfer.dropEffect = "move"; // Set the drop effect for the dragover event to "move", indicating that the dragged item can be moved to a new location.
     elements.ratesBody.querySelectorAll(".drop-before, .drop-after").forEach((row) => row.classList.remove("drop-before", "drop-after"));
-    const bounds = targetRow.getBoundingClientRect();
-    const afterTarget = event.clientY > bounds.top + bounds.height / 2;
-    targetRow.classList.add(afterTarget ? "drop-after" : "drop-before");
+    const bounds = targetRow.getBoundingClientRect(); // Get the bounding rectangle of the target row to determine its position and dimensions on the screen, which will be used to calculate whether the dragged pair should be placed before or after the target row based on the cursor position.
+    const afterTarget = event.clientY > bounds.top + bounds.height / 2; // Determine whether the dragged pair should be placed after the target row based on the vertical position of the cursor relative to the midpoint of the target row's bounding rectangle.
+    targetRow.classList.add(afterTarget ? "drop-after" : "drop-before");  // Add a visual feedback class to the target row to indicate whether the dragged pair will be placed before or after it, providing immediate visual feedback to the user during the drag-and-drop operation.
   }); // Handle the dragover event on the rates table body, providing visual feedback for potential drop targets and determining whether the dragged pair should be placed before or after the target row based on the cursor position.
   elements.ratesBody.addEventListener("drop", (event) => {
-    if (!draggedPairId) return;               // If there is no dragged pair ID, exit the function early to prevent any further processing of the drop event.
+    if (!draggedPairId) return;        // If there is no dragged pair ID, exit the function early to prevent any further processing of the drop event.
     const targetRow = event.target.closest("tr[data-pair]");  // Find the closest table row element that has a "data-pair" attribute, which represents the target currency pair for the drop operation.
-    if (!targetRow) return;                   // If there is no valid target row, exit the function early to prevent any further processing of the drop event.
-    event.preventDefault();                   // Prevent the default behavior of the drop event to allow for custom handling of the drop operation.
-    const sourceId = draggedPairId;               // Store the ID of the dragged currency pair for reordering.
-    const targetId = targetRow.dataset.pair;      // Store the ID of the target currency pair where the dragged pair will be dropped.
+    if (!targetRow) return;           // If there is no valid target row, exit the function early to prevent any further processing of the drop event.
+    event.preventDefault();           // Prevent the default behavior of the drop event to allow for custom handling of the drop operation.
+    const sourceId = draggedPairId;       // Store the ID of the dragged currency pair for reordering.
+    const targetId = targetRow.dataset.pair;  // Store the ID of the target currency pair where the dragged pair will be dropped.
     const afterTarget = targetRow.classList.contains("drop-after"); // Determine whether the dragged pair should be placed after the target based on the presence of the "drop-after" class on the target row.
-    draggedPairId = null;                         // Reset the dragged pair ID to null after the drop operation is complete.
+    draggedPairId = null;                     // Reset the dragged pair ID to null after the drop operation is complete.
     reorderPair(sourceId, targetId, afterTarget, { restoreFocus: false });
   }); // Handle the drop event on the rates table body, reordering the dragged currency pair based on the target row and whether it should be placed before or after the target. This function also prevents the default behavior and resets the dragged pair ID.
   elements.ratesBody.addEventListener("dragend", () => {
@@ -1138,8 +1138,8 @@ function initializeEvents() {
   elements.swapCurrencies.addEventListener("click", () => {
     const base = elements.calculatorBase.value;   // Store the current base currency value before swapping.
     elements.calculatorBase.value = elements.calculatorQuote.value; // Swap the base currency value with the current quote currency value.
-    elements.calculatorQuote.value = base;        // Swap the quote currency value with the previously stored base currency value.
-    changeCalculatorCurrencies("quote");          // Call the function to handle the change in calculator currencies, passing "quote" as the changed selector to ensure that the two currencies are not the same and updating the calculator results accordingly.
+    elements.calculatorQuote.value = base;    // Swap the quote currency value with the previously stored base currency value.
+    changeCalculatorCurrencies("quote");    // Call the function to handle the change in calculator currencies, passing "quote" as the changed selector to ensure that the two currencies are not the same and updating the calculator results accordingly.
   }); // Handle the swapping of the calculator's base and quote currencies when the swap button is clicked, updating the selectors and re-rendering the calculator results accordingly.
   elements.calculatorAddPair.addEventListener("click", addCalculatorPairToBoard);   // Handle the addition of the currently selected calculator pair to the rates board when the add pair button is clicked, validating the pair and updating the settings and UI accordingly.
   elements.calculatorAmount.addEventListener("input", renderCalculator);    // Handle input changes to the calculator's amount field, re-rendering the calculator results based on the entered amount and the selected currencies.
