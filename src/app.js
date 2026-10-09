@@ -393,7 +393,7 @@ function updateFeedStatus() {
   if (!ratesAvailable) {
     elements.rateDate.textContent = "No reference data";
     elements.checkedAt.textContent = referenceMeta.checkedAt ? `Last checked ${formatCheckedAt(referenceMeta.checkedAt)}` : "Waiting for the first provider response";
-  } else {
+  } else {  // If rates are available, determine the latest observation date and update the rate date and checked at information accordingly.
     const dates = boardRates.map((rate) => rate.date).filter(Boolean).sort();
     const latestDate = dates.at(-1);
     elements.rateDate.textContent = latestDate ? formatDate(latestDate) : "Date unavailable";
