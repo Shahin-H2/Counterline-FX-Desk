@@ -611,6 +611,7 @@ async function loadRates({ announceSuccess = false } = {}) {
   }
 }
 
+// Render the options for the calculator's base and quote currency selectors, ensuring that all currencies in the current pairs and any special assets are included. The previously selected currencies are preserved if still available; otherwise, defaults are chosen based on the first pair or the first available option.
 function renderCalculatorOptions() {
   const previousBase = elements.calculatorBase.value;
   const previousQuote = elements.calculatorQuote.value;
