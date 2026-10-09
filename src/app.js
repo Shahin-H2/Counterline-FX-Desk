@@ -554,6 +554,7 @@ async function loadCurrencies() {
   if (!settings.pairs.includes(selectedPair)) refreshCalculatorReference(selectedPair);
 }
 
+// Load the reference rates for the current pairs from the server, updating the UI with loading states, errors, and the resulting data. If the fetch fails, fall back to a cached version if available.
 async function loadRates({ announceSuccess = false } = {}) {
   const pairs = settings.pairs.map(pairParts);
   if (!pairs.length) return;
