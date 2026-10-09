@@ -515,8 +515,8 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
           <button class="row-action" type="button" data-remove-pair="${escapeHtml(id)}" aria-label="Remove ${escapeHtml(id)} from the rate board" title="Remove pair"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10M8 6V4h4v2m2 0-.6 9.5H6.6L6 6m2.5 2.5v4m3-4v4" /></svg></button>
         </div></td>
       </tr>`;
-    }).join("");  
-  } 
+    }).join("");
+  }
   if (animateRows) hasAnimatedRows = true;  // Mark that the initial row animation has completed to prevent re-animating rows on subsequent renders.
   updateFeedStatus();
   renderCalculatorOptions();
@@ -727,7 +727,7 @@ function refreshCalculatorReference(id, { force = false } = {}) {
     })  // Handle any errors that occur during the fetch or response processing, marking the lookup state as "cached" or "error" as appropriate, and re-rendering the calculator if the current pair matches the requested pair.
     .catch(() => {
       calculatorLookupState.set(id, referenceRates[id] ? "cached" : "error");
-      if (currentCalculatorPair() === id) renderCalculator(); 
+      if (currentCalculatorPair() === id) renderCalculator();
     });
 }
 
@@ -739,8 +739,8 @@ function changeCalculatorCurrencies(changed) {
     const previousAlternate = changed === "base" ? previousCalculatorSelection.base : previousCalculatorSelection.quote;
     const alternate = previousAlternate !== currentCode && currenciesAvailable.includes(previousAlternate)
       ? previousAlternate
-      : currenciesAvailable.find((code) => code !== currentCode); 
-    if (changed === "base") elements.calculatorQuote.value = alternate ?? ""; 
+      : currenciesAvailable.find((code) => code !== currentCode);
+    if (changed === "base") elements.calculatorQuote.value = alternate ?? "";
     else elements.calculatorBase.value = alternate ?? "";
   } // If the user selects the same currency for both base and quote, automatically switch the other selector to a different available currency.
   previousCalculatorSelection = { base: elements.calculatorBase.value, quote: elements.calculatorQuote.value };
@@ -761,7 +761,7 @@ function addCalculatorPairToBoard() {
   if (settings.pairs.length >= MAX_BOARD_PAIRS) {
     announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`);  // Check if the board has reached its maximum capacity before adding the new pair, and announce a message if it has.
     return;
-  } // Check if the board has reached its maximum capacity before adding the new pair.
+  }   // Check if the board has reached its maximum capacity before adding the new pair.
   settings.pairs.push(id);  // Add the new pair to the end of the settings.pairs array, which represents the current order of pairs on the board.
   const saved = saveSettings(); // Save the updated settings to localStorage, returning a boolean indicating whether the save was successful.
   renderTable({ animatePair: id, highlightPair: id });  // Re-render the table to include the newly added pair, highlighting it for visibility and animating its entry into the board.
@@ -819,7 +819,7 @@ function flipPairDirection(id) {
   renderTable({ highlightPair: flippedId });
   loadRates();        // Refresh the reference rates for the updated pair direction, ensuring that the calculator and table display the correct rates for the new pair.
   loadPairHistory();  // Refresh the pair history for the updated pair direction, ensuring that any historical data displayed in the UI reflects the new pair configuration.
-  announce(saved    
+  announce(saved
     ? `${id} direction changed to ${flippedId}. Desk prices remain separate for each direction.`
     : `${id} direction changed for this session. Desk prices remain separate for each direction.`);
 }
@@ -900,7 +900,7 @@ function openPriceDialog(id) {
   elements.priceSell.value = prices.sell ?? ""; // Populate the sell price input field with the existing sell price for the specified pair, defaulting to an empty string if no price is set, allowing the user to edit or set a new sell price.
   document.querySelectorAll(".price-quote-code").forEach((node) => { node.textContent = quote; });  // Update all elements in the dialog that display the quote currency code to reflect the currently selected quote currency, ensuring consistency in the UI and providing clear context for the user when entering desk prices.
   elements.priceReferenceRate.textContent = reference ? `1 ${base} = ${formatPairRate(reference.rate)} ${quote}` : "No reference rate available";
-  elements.priceReferenceDate.textContent = reference 
+  elements.priceReferenceDate.textContent = reference
     ? `${reference.source ?? (isMetalPair(base, quote) ? "Metal reference" : "Frankfurter blended reference")} · ${formatRateObservation(reference)}`
     : isMetalPair(base, quote) ? "A metals data source is needed for this reference quote" : "Reference data is not a customer price";
   elements.priceValidation.hidden = true;
@@ -1043,7 +1043,7 @@ function initializeEvents() {
     renderTable({ animatePair: id, highlightPair: id });  // Re-render the rates table to reflect the addition of the new pair, applying an animation to the newly added row and highlighting it for visual feedback.
     renderCalculatorOptions();  // Re-render the calculator options to include the newly added pair, ensuring that the base and quote selectors are updated with the available currencies and metals.
     loadRates();        // Load the latest reference rates for all pairs, including the newly added pair, to ensure that the rates board displays up-to-date information.
-    loadPairHistory();  // Load the historical data for all pairs, including the newly added pair, to provide users with access to past rate information and trends.
+    loadPairHistory();    // Load the historical data for all pairs, including the newly added pair, to provide users with access to past rate information and trends.
     announce(isMetalPair(base, quote) // If the newly added pair is a metal pair, announce that it has been added and that the reference quote will appear after a metals source is configured. Otherwise, announce that the pair has been added to the rates board or for this session if browser storage is unavailable.
       ? `${id} added. The reference quote will appear after a metals source is configured.`
       : saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
