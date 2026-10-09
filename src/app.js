@@ -1,6 +1,8 @@
+// Copyright 2024 Counterline, Inc. All rights reserved.
 import { compareDecimals, formatDecimal, isPositiveDecimal, multiplyAndRound, parseDecimal } from "./domain/decimal.js";
 import { isObservationStale } from "./domain/freshness.js";
 
+// Storage keys
 const STORAGE_KEY = "counterline-fx-prices-v1";
 const REFERENCE_CACHE_KEY = "counterline-fx-reference-cache-v1";
 const CURRENCY_CACHE_KEY = "counterline-fx-currencies-v1";
@@ -10,62 +12,64 @@ const DEFAULT_PAIRS = ["USD/EUR", "USD/CAD", "USD/MXN", "USD/GBP", "USD/TRY", "U
 const METAL_ASSETS = [
   { code: "XAU", name: "Gold (troy ounce)", symbol: "Au" },
   { code: "XAG", name: "Silver (troy ounce)", symbol: "Ag" },
-];
+]; // These are the only two metals supported for reference rates, and they must be paired with USD.
 const METAL_CODES = new Set(METAL_ASSETS.map(({ code }) => code));
 const MAX_BOARD_PAIRS = 30;
 const MANUAL_RATE_PATTERN = /^\d+(?:\.\d{1,8})?$/;
 const locale = navigator.language || "en-US";
 
+// DOM elements
 const elements = {
-  ratesBody: document.querySelector("#rates-body"),
-  pairTotal: document.querySelector("#pair-total"),
-  navPairCount: document.querySelector("#nav-pair-count"),
-  feedPill: document.querySelector("#feed-pill"),
-  rateDate: document.querySelector("#rate-date"),
-  checkedAt: document.querySelector("#checked-at"),
-  feedAlert: document.querySelector("#feed-alert"),
-  sidebarFeedStatus: document.querySelector("#sidebar-feed-status"),
-  refreshButton: document.querySelector("#refresh-button"),
-  searchInput: document.querySelector("#search-input"),
-  emptySearch: document.querySelector("#empty-search"),
-  optionsToggle: document.querySelector("#display-options-toggle"),
-  displayOptions: document.querySelector("#display-options"),
-  pairFilter: document.querySelector("#pair-filter"),
-  pairSort: document.querySelector("#pair-sort"),
-  boardDensity: document.querySelector("#board-density"),
-  boardTheme: document.querySelector("#board-theme"),
-  resetDisplayOptions: document.querySelector("#reset-display-options"),
-  pairDialog: document.querySelector("#pair-dialog"),
-  pairForm: document.querySelector("#pair-form"),
-  pairBase: document.querySelector("#pair-base"),
-  pairQuote: document.querySelector("#pair-quote"),
-  pairPreview: document.querySelector("#pair-preview"),
-  priceDialog: document.querySelector("#price-dialog"),
-  priceForm: document.querySelector("#price-form"),
-  pricePairId: document.querySelector("#price-pair-id"),
-  priceDialogTitle: document.querySelector("#price-dialog-title"),
-  priceDialogDescription: document.querySelector("#price-dialog-description"),
-  priceBuy: document.querySelector("#price-buy"),
-  priceSell: document.querySelector("#price-sell"),
-  priceReferenceRate: document.querySelector("#price-reference-rate"),
-  priceReferenceDate: document.querySelector("#price-reference-date"),
-  priceValidation: document.querySelector("#price-validation"),
-  calculatorBase: document.querySelector("#calculator-base"),
-  calculatorQuote: document.querySelector("#calculator-quote"),
-  swapCurrencies: document.querySelector("#swap-currencies"),
-  calculatorBaseCode: document.querySelector("#calculator-base-code"),
-  calculatorAmount: document.querySelector("#calculator-amount"),
-  calculatorReferenceResult: document.querySelector("#calculator-reference-result"),
-  calculatorReferenceMeta: document.querySelector("#calculator-reference-meta"),
-  calculatorBuyResult: document.querySelector("#calculator-buy-result"),
-  calculatorSellResult: document.querySelector("#calculator-sell-result"),
-  calculatorAddPair: document.querySelector("#calculator-add-pair"),
-  historyGrid: document.querySelector("#history-grid"),
-  historyStatus: document.querySelector("#history-status"),
-  historyRanges: document.querySelector(".history-controls"),
-  announcements: document.querySelector("#announcements"),
+  ratesBody: document.querySelector("#rates-body"),     // tbody for the main rate board
+  pairTotal: document.querySelector("#pair-total"),     // total count of pairs on the board
+  navPairCount: document.querySelector("#nav-pair-count"),  // total count of pairs in the navigation bar
+  feedPill: document.querySelector("#feed-pill"),     // the status indicator in the navigation bar
+  rateDate: document.querySelector("#rate-date"),       // the date of the most recent reference observation
+  checkedAt: document.querySelector("#checked-at"),     // the time the reference feed was last checked
+  feedAlert: document.querySelector("#feed-alert"),   // the alert box for feed issues
+  sidebarFeedStatus: document.querySelector("#sidebar-feed-status"),  // the text in the sidebar showing the feed status
+  refreshButton: document.querySelector("#refresh-button"), // the button to refresh the reference feed
+  searchInput: document.querySelector("#search-input"),     // the input for searching pairs
+  emptySearch: document.querySelector("#empty-search"),     // the empty state message when no pairs match the search/filter
+  optionsToggle: document.querySelector("#display-options-toggle"), // the button to toggle the display options panel
+  displayOptions: document.querySelector("#display-options"),       // the panel containing display options
+  pairFilter: document.querySelector("#pair-filter"),     // the select input for filtering pairs
+  pairSort: document.querySelector("#pair-sort"),         // the select input for sorting pairs
+  boardDensity: document.querySelector("#board-density"), // the select input for changing the density of the board
+  boardTheme: document.querySelector("#board-theme"),     // the select input for changing the theme of the board
+  resetDisplayOptions: document.querySelector("#reset-display-options"),  // the button to reset display options to default
+  pairDialog: document.querySelector("#pair-dialog"),     // the dialog for adding a new pair
+  pairForm: document.querySelector("#pair-form"),         // the form inside the pair dialog
+  pairBase: document.querySelector("#pair-base"),         // the input for the base currency in the pair dialog
+  pairQuote: document.querySelector("#pair-quote"),       // the input for the quote currency in the pair dialog
+  pairPreview: document.querySelector("#pair-preview"),   // the preview of the pair in the pair dialog
+  priceDialog: document.querySelector("#price-dialog"),   // the dialog for setting prices
+  priceForm: document.querySelector("#price-form"),       // the form inside the price dialog
+  pricePairId: document.querySelector("#price-pair-id"),  // the hidden input for the pair ID in the price dialog
+  priceDialogTitle: document.querySelector("#price-dialog-title"),  // the title of the price dialog
+  priceDialogDescription: document.querySelector("#price-dialog-description"),  // the description of the price dialog
+  priceBuy: document.querySelector("#price-buy"),         // the input for the buy price in the price dialog
+  priceSell: document.querySelector("#price-sell"),       // the input for the sell price in the price dialog
+  priceReferenceRate: document.querySelector("#price-reference-rate"),  // the element showing the reference rate in the price dialog
+  priceReferenceDate: document.querySelector("#price-reference-date"),  // the element showing the reference date in the price dialog
+  priceValidation: document.querySelector("#price-validation"), // the element showing validation messages in the price dialog
+  calculatorBase: document.querySelector("#calculator-base"),   // the select input for the base currency in the calculator
+  calculatorQuote: document.querySelector("#calculator-quote"), // the select input for the quote currency in the calculator
+  swapCurrencies: document.querySelector("#swap-currencies"),   // the button to swap the base and quote currencies in the calculator
+  calculatorBaseCode: document.querySelector("#calculator-base-code"),  // the element showing the base currency code in the calculator
+  calculatorAmount: document.querySelector("#calculator-amount"),       // the input for the amount in the calculator
+  calculatorReferenceResult: document.querySelector("#calculator-reference-result"),  // the element showing the reference result in the calculator
+  calculatorReferenceMeta: document.querySelector("#calculator-reference-meta"),      // the element showing the reference meta information in the calculator
+  calculatorBuyResult: document.querySelector("#calculator-buy-result"),    // the element showing the buy result in the calculator
+  calculatorSellResult: document.querySelector("#calculator-sell-result"),  // the element showing the sell result in the calculator
+  calculatorAddPair: document.querySelector("#calculator-add-pair"),  // the button to add the calculator pair to the board
+  historyGrid: document.querySelector("#history-grid"),       // the container for the history charts
+  historyStatus: document.querySelector("#history-status"),   // the element showing the status of the history loading
+  historyRanges: document.querySelector(".history-controls"), // the container for the history range buttons
+  announcements: document.querySelector("#announcements"),    // the live region for announcing changes to screen readers
 };
 
+// Utility functions
 function readJson(key, fallback) {
   try {
     const value = localStorage.getItem(key);
@@ -75,10 +79,12 @@ function readJson(key, fallback) {
   }
 }
 
+// Validate that a pair ID is in the correct format (e.g., "USD/EUR") and that the base and quote currencies are not the same.
 function validPairId(value) {
   return typeof value === "string" && /^[A-Z]{3}\/[A-Z]{3}$/.test(value) && value.slice(0, 3) !== value.slice(4);
 }
 
+// Load settings from localStorage, ensuring that the pairs and prices are valid and within the allowed limits.
 function loadSettings() {
   const saved = readJson(STORAGE_KEY, null);
   if (!saved || typeof saved !== "object") return { pairs: [...DEFAULT_PAIRS], prices: {} };
@@ -97,6 +103,7 @@ function loadSettings() {
   return { pairs, prices };
 }
 
+// Initialize application state
 const settings = loadSettings();
 const savedView = readJson(VIEW_STORAGE_KEY, {}) ?? {};
 const view = {
@@ -104,7 +111,7 @@ const view = {
   sort: ["board", "code", "name", "rate-high", "rate-low"].includes(savedView.sort) ? savedView.sort : DEFAULT_VIEW.sort,
   density: ["comfortable", "compact"].includes(savedView.density) ? savedView.density : DEFAULT_VIEW.density,
   theme: ["evergreen", "night"].includes(savedView.theme) ? savedView.theme : DEFAULT_VIEW.theme,
-};
+};  // The view settings control how the board is displayed, including filtering, sorting, density, and theme.
 let referenceRates = {};
 let referenceMeta = { cacheStatus: "loading", errors: [], retrievedAt: null, checkedAt: null };
 let currencies = [];
@@ -117,11 +124,13 @@ let pairHistory = {};
 let historyRequestId = 0;
 let historyLoading = false;
 
+// Helper functions
 function pairParts(id) {
   const [base, quote] = id.split("/");
   return { base, quote };
 }
 
+// Get the full name of a currency given its code, or return the code if not found.
 function currencyName(code) {
   return currencies.find((currency) => currency.code === code)?.name ?? code;
 }
@@ -130,15 +139,18 @@ function currencyMark(code) {
   return METAL_ASSETS.find((asset) => asset.code === code)?.symbol ?? code.slice(0, 2);
 }
 
+// Check if either the base or quote currency is a metal (gold or silver).
 function isMetalPair(base, quote) {
   return METAL_CODES.has(base) || METAL_CODES.has(quote);
 }
 
+// Check if a currency pair is supported for reference rates. Gold and silver pairs must be paired with USD.
 function isSupportedPair(base, quote) {
   if (!isMetalPair(base, quote)) return true;
   return (METAL_CODES.has(base) && quote === "USD") || (base === "USD" && METAL_CODES.has(quote));
 }
 
+// Return a human-readable description of the unit for a metal pair, or a generic message if not applicable.
 function metalPairUnit(base, quote) {
   if (base === "USD" && quote === "XAU") return "Troy ounces of gold per USD";
   if (base === "USD" && quote === "XAG") return "Troy ounces of silver per USD";
@@ -147,6 +159,7 @@ function metalPairUnit(base, quote) {
   return "Gold and silver pairs use USD";
 }
 
+// Ensure that the list of currencies includes USD, IRR, and the supported metal assets (XAU and XAG).
 function ensureSpecialAssets(list) {
   const next = list.filter((currency) => !METAL_CODES.has(currency.code));
   if (!next.some((currency) => currency.code === "USD")) next.push({ code: "USD", name: "US Dollar", symbol: "$" });
@@ -157,10 +170,12 @@ function ensureSpecialAssets(list) {
   return next;
 }
 
+// Escape HTML special characters in a string to prevent XSS vulnerabilities when rendering user-provided content.
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 }
 
+// Format a date string (YYYY-MM-DD) into a human-readable format based on the user's locale and specified options.
 function formatDate(dateString, options = { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) {
   if (!dateString) return "Date unavailable";
   const date = new Date(`${dateString.slice(0, 10)}T00:00:00Z`);
@@ -168,11 +183,13 @@ function formatDate(dateString, options = { month: "short", day: "numeric", year
   return new Intl.DateTimeFormat(locale, options).format(date);
 }
 
+// Format the time when the reference feed was last checked, or return a default message if unavailable.
 function formatCheckedAt(value) {
   if (!value || Number.isNaN(new Date(value).getTime())) return "Check time unavailable";
   return new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
+// Format the observed date and time of a reference rate, or fall back to the date if the observed time is unavailable.
 function formatRateObservation(rate, dateOptions = { month: "short", day: "numeric", timeZone: "UTC" }) {
   const options = { month: "short", day: "numeric", timeZone: "UTC", ...dateOptions };
   if (rate?.observedAt && !Number.isNaN(new Date(rate.observedAt).getTime())) {
@@ -181,10 +198,12 @@ function formatRateObservation(rate, dateOptions = { month: "short", day: "numer
   return formatDate(rate?.date, options);
 }
 
+// Format a currency pair rate to a string with a specified number of decimal places, ensuring that it is displayed in a user-friendly format.
 function formatPairRate(rate) {
   return formatDecimal(rate, locale, 2, 8);
 }
 
+// Render the historical chart for a currency pair, including the line graph, area fill, grid lines, and data points. If no observations are available, display an appropriate message or loading state.
 function historyChartMarkup(id, observations, cardIndex) {
   const { base, quote } = pairParts(id);
   const points = (Array.isArray(observations) ? observations : [])
@@ -197,7 +216,7 @@ function historyChartMarkup(id, observations, cardIndex) {
     }
     return `<article class="history-card history-card-empty" role="listitem"><div class="history-card-title"><div><h3>${escapeHtml(base)} <span aria-hidden="true">→</span> ${escapeHtml(quote)}</h3><p>${escapeHtml(currencyLabel)}</p></div></div><div class="history-empty-state"><span class="history-empty-icon" aria-hidden="true">⌁</span><strong>No history in this range</strong><span>The source may not publish on these dates or cover this currency.</span></div></article>`;
   }
-
+  // Calculate the dimensions and coordinates for the chart, including the min/max values, padding, and scaling for the SVG elements.
   const width = 680;
   const height = 190;
   const plot = { left: 64, right: 666, top: 16, bottom: 143 };
@@ -211,7 +230,7 @@ function historyChartMarkup(id, observations, cardIndex) {
   const coordinate = (point, index) => ({
     x: points.length === 1 ? (plot.left + plot.right) / 2 : plot.left + (plot.right - plot.left) * index / (points.length - 1),
     y: plot.bottom - (point.value - low) / span * (plot.bottom - plot.top),
-  });
+  }); // Map each data point to its corresponding x and y coordinates within the SVG plot area.
   const coords = points.map(coordinate);
   const line = coords.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
   const area = `${line} L${coords.at(-1).x.toFixed(2)} ${plot.bottom} L${coords[0].x.toFixed(2)} ${plot.bottom} Z`;
@@ -220,13 +239,14 @@ function historyChartMarkup(id, observations, cardIndex) {
   const grid = yLabels.map((value, index) => {
     const y = plot.top + (plot.bottom - plot.top) * index / 2;
     return `<g class="history-gridline"><line x1="${plot.left}" y1="${y.toFixed(2)}" x2="${plot.right}" y2="${y.toFixed(2)}"/><text x="${plot.left - 10}" y="${(y + 4).toFixed(2)}" text-anchor="end">${escapeHtml(formatPairRate(String(value)))}</text></g>`;
-  }).join("");
+  }).join("");  // Render the horizontal grid lines and their corresponding labels for the min, mid, and max values of the chart.
   const dots = coords.map((point, index) => `<circle class="history-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="2.35"><title>${escapeHtml(formatDate(points[index].date))}: ${escapeHtml(formatPairRate(points[index].rate))} ${escapeHtml(quote)}</title></circle>`).join("");
   const firstDate = formatDate(points[0].date, { month: "short", day: "numeric" });
   const lastDate = formatDate(points.at(-1).date, { month: "short", day: "numeric" });
   const latest = points.at(-1);
   const ariaLabel = `${base} to ${quote} daily reference rate from ${formatDate(points[0].date)} to ${formatDate(latest.date)}`;
-  return `<article class="history-card" role="listitem">
+  // Return the complete HTML markup for the history card, including the title, latest rate, chart, and footer with low/high values.
+  return `<article class="history-card" role="listitem"> 
     <div class="history-card-title"><div><h3>${escapeHtml(base)} <span aria-hidden="true">→</span> ${escapeHtml(quote)}</h3><p>${escapeHtml(currencyLabel)}</p></div><span class="history-observation-count">${points.length} ${points.length === 1 ? "point" : "points"}</span></div>
     <div class="history-latest"><span>1 ${escapeHtml(base)} <span aria-hidden="true">=</span></span><strong>${escapeHtml(formatPairRate(latest.rate))}</strong><small>${escapeHtml(quote)} · ${escapeHtml(formatDate(latest.date))}</small></div>
     <svg class="history-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(ariaLabel)}">
@@ -238,6 +258,7 @@ function historyChartMarkup(id, observations, cardIndex) {
   </article>`;
 }
 
+// Render the history grid with the current pair history data, showing loading states or empty messages as appropriate.
 function renderPairHistory() {
   if (!elements.historyGrid) return;
   elements.historyGrid.setAttribute("aria-busy", String(historyLoading));
@@ -246,6 +267,7 @@ function renderPairHistory() {
     : '<div class="history-board-empty" role="listitem"><strong>No currency pairs yet</strong><span>Add a pair to see its rate history here.</span></div>';
 }
 
+// Load the historical reference rates for the current pairs and range, updating the UI with loading states, errors, and the resulting data.
 async function loadPairHistory() {
   const requestId = ++historyRequestId;
   if (!settings.pairs.length) {
@@ -254,7 +276,7 @@ async function loadPairHistory() {
     renderPairHistory();
     elements.historyStatus.textContent = "Add currency pairs to view daily history.";
     return;
-  }
+  } // If there are no pairs on the board, clear the history and show a message indicating that pairs need to be added.
   pairHistory = {};
   historyLoading = true;
   renderPairHistory();
@@ -283,6 +305,7 @@ async function loadPairHistory() {
   }
 }
 
+// Determine the number of decimal places to display for a given currency code, using the Intl.NumberFormat API to get the maximum fraction digits for that currency. If the currency is a metal (gold or silver), return 8 decimal places. If the currency code is invalid or not supported, default to 2 decimal places.
 function amountDigits(code) {
   if (METAL_CODES.has(code)) return 8;
   try {
@@ -293,10 +316,12 @@ function amountDigits(code) {
   }
 }
 
+// Save the current settings (pairs and prices) to localStorage, returning true if successful or false if an error occurs.
 function saveSettings() {
   return writeJson(STORAGE_KEY, settings);
 }
 
+// Save the current reference cache to localStorage, returning true if successful or false if an error occurs.
 function writeJson(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -306,17 +331,20 @@ function writeJson(key, value) {
   }
 }
 
+// Announce a message to screen readers by clearing the live region and then setting the text content after a short delay, ensuring that the message is read aloud.
 function announce(message) {
   elements.announcements.textContent = "";
   window.setTimeout(() => { elements.announcements.textContent = message; }, 30);
 }
 
+// Update the feed status pill in the navigation bar and sidebar with the given label and state, reflecting the current status of the reference feed.
 function setFeedPill(label, state) {
   elements.feedPill.dataset.state = state;
   elements.feedPill.innerHTML = `<span class="status-dot"></span><span>${escapeHtml(label)}</span>`;
   elements.sidebarFeedStatus.textContent = label;
 }
 
+// Get the list of currency pairs that have stale reference observations, defined as being older than 3 calendar days from today.
 function currentStalePairs() {
   const today = new Date();
   return settings.pairs.filter((id) => {
