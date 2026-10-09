@@ -422,17 +422,19 @@ function updateFeedStatus() {
     alertText = metalProviderNeeded
       ? `Currency references loaded, but ${missingPairs.length} gold/silver pair${missingPairs.length === 1 ? " is" : "s are"} still need a metals source. Missing rows are labeled individually.`
       : `Partial reference coverage: ${missingPairs.length} pair${missingPairs.length === 1 ? " has" : "s have"} no returned rate. Missing rows are labeled individually.`;
-  }
+  } // Update the feed alert area with the determined alert message and kind, showing or hiding it based on whether there is an alert to display.
   elements.feedAlert.hidden = !alertText;
   elements.feedAlert.dataset.kind = alertKind;
   elements.feedAlert.textContent = alertText;
 }
 
+// Render the price text for a given price and quote currency, returning a span element with the formatted price or a placeholder if the price is not available.
 function priceText(price, quote, className = "") {
   if (!price) return `<span class="price-readout ${className}">—</span>`;
   return `<span class="price-readout ${className}">${escapeHtml(formatPairRate(price))} <small>${escapeHtml(quote)}</small></span>`;
 }
 
+// Render the main table of currency pairs, including their reference rates, customer prices, and any relevant status indicators. This function handles filtering, sorting, and displaying the appropriate messages when no pairs match the current search or filter criteria.
 function renderTable({ animateRows = false, animatePair = null, highlightPair = null } = {}) {
   elements.pairTotal.textContent = `${settings.pairs.length} pair${settings.pairs.length === 1 ? "" : "s"}`;
   elements.navPairCount.textContent = String(settings.pairs.length).padStart(2, "0");
@@ -445,6 +447,7 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
     return;
   }
 
+  // Filter the list of currency pairs based on the current search term and view filter, returning only those pairs that match the criteria.
   const normalizedSearch = searchTerm.trim().toLocaleLowerCase(locale);
   const visiblePairs = settings.pairs.filter((id) => {
     const { base, quote } = pairParts(id);
@@ -459,13 +462,13 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
       if (!hasReferenceIssue) return false;
     }
     return true;
-  });
+  }); // Sort the visible pairs based on the current view sort option, using different criteria for code, name, and rate sorting.
   const sortedPairs = [...visiblePairs];
   if (view.sort === "code") sortedPairs.sort((a, b) => a.localeCompare(b));
   if (view.sort === "name") sortedPairs.sort((a, b) => {
     const aParts = pairParts(a); const bParts = pairParts(b);
     return `${currencyName(aParts.base)} ${currencyName(aParts.quote)}`.localeCompare(`${currencyName(bParts.base)} ${currencyName(bParts.quote)}`, locale);
-  });
+  }); // Sort by the full currency names for the base and quote currencies.
   if (view.sort === "rate-high" || view.sort === "rate-low") sortedPairs.sort((a, b) => {
     const aRate = referenceRates[a]?.rate; const bRate = referenceRates[b]?.rate;
     if (!aRate && !bRate) return 0;
@@ -473,7 +476,7 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
     if (!bRate) return -1;
     const order = compareDecimals(aRate, bRate);
     return view.sort === "rate-high" ? -order : order;
-  });
+  }); // Sort by the reference rate, handling cases where one or both rates may be missing.
   elements.emptySearch.hidden = sortedPairs.length > 0;
   if (!sortedPairs.length) {
     const title = elements.emptySearch.querySelector("strong");
@@ -483,10 +486,10 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
       title.textContent = normalizedSearch ? "No pairs found" : "No pairs match these options";
       message.textContent = normalizedSearch ? "Try another code, name, or board filter." : filtered ? "Adjust the filter or add prices to see more pairs." : "Try a currency code or name.";
     }
-  }
+  } // If there are no visible pairs after filtering and sorting, clear the rates table. Otherwise, generate the HTML for each visible pair, including its reference rate, customer prices, and action buttons for editing, moving, flipping, or removing the pair.
   if (!visiblePairs.length) {
     elements.ratesBody.innerHTML = "";
-  } else {
+  } else {  // Generate the HTML for each visible pair, including its reference rate, customer prices, and action buttons for editing, moving, flipping, or removing the pair.
     elements.ratesBody.innerHTML = sortedPairs.map((id, index) => {
       const { base, quote } = pairParts(id);
       const rate = referenceRates[id];
@@ -512,14 +515,15 @@ function renderTable({ animateRows = false, animatePair = null, highlightPair = 
           <button class="row-action" type="button" data-remove-pair="${escapeHtml(id)}" aria-label="Remove ${escapeHtml(id)} from the rate board" title="Remove pair"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10M8 6V4h4v2m2 0-.6 9.5H6.6L6 6m2.5 2.5v4m3-4v4" /></svg></button>
         </div></td>
       </tr>`;
-    }).join("");
-  }
-  if (animateRows) hasAnimatedRows = true;
+    }).join("");  
+  } 
+  if (animateRows) hasAnimatedRows = true;  // Mark that the initial row animation has completed to prevent re-animating rows on subsequent renders.
   updateFeedStatus();
   renderCalculatorOptions();
   renderPairHistory();
 }
 
+// Read the reference cache from localStorage, validating its structure and contents. If the cache is valid, return an object containing the cached rates and metadata; otherwise, return null.
 function readReferenceCache() {
   const cached = readJson(REFERENCE_CACHE_KEY, null);
   if (!cached || typeof cached !== "object" || !cached.rates || typeof cached.rates !== "object") return null;
@@ -530,6 +534,7 @@ function readReferenceCache() {
   return Object.keys(rates).length ? { ...cached, rates } : null;
 }
 
+// Load the list of supported currencies from the server, filtering out any invalid entries and ensuring that special assets (like gold and silver) are included. If the fetch fails, fall back to a cached version if available.
 async function loadCurrencies() {
   try {
     const response = await fetch("/api/currencies");
