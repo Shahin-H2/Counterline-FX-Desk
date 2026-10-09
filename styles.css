@@ -417,15 +417,18 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
 .history-board-empty { grid-column: 1 / -1; display: grid; justify-items: center; gap: 5px; padding: 38px 16px; border: 1px dashed var(--line-strong); border-radius: 7px; color: #89968e; text-align: center; }
 .history-board-empty strong { color: #506359; font-size: 14px; }
 .history-board-empty span { font-size: 12px; }
-
+/* ==========================================================================
+                              Dialogs
+    ========================================================================== */
 .app-dialog { width: min(490px, calc(100vw - 28px)); max-width: 490px; padding: 0; overflow: visible; border: 1px solid #e3e9df; border-radius: 9px; color: var(--ink); background: #fff; box-shadow: 0 24px 80px rgb(17 42 36 / 22%); opacity: 0; transform: translateY(10px) scale(.985); transition: opacity .2s ease, transform .24s cubic-bezier(.2, .75, .25, 1), display .24s allow-discrete, overlay .24s allow-discrete; }
 .app-dialog[open] { opacity: 1; transform: translateY(0) scale(1); }
 .app-dialog::backdrop { background: rgb(12 32 30 / 46%); backdrop-filter: blur(2px); opacity: 0; transition: opacity .22s ease, display .22s allow-discrete, overlay .22s allow-discrete; }
 .app-dialog[open]::backdrop { opacity: 1; }
+/* Dialog open animation is delayed to allow for the backdrop to fade in first, so that the dialog doesn't appear to "pop" in front of the backdrop. */
 @starting-style {
   .app-dialog[open] { opacity: 0; transform: translateY(10px) scale(.985); }
   .app-dialog[open]::backdrop { opacity: 0; }
-}
+} 
 .app-dialog form { padding: 22px; }
 .dialog-top { display: flex; justify-content: space-between; align-items: flex-start; }
 .dialog-top h2 { margin: 6px 0 0; color: #263b35; font: 700 22px "Manrope", sans-serif; letter-spacing: -.8px; }
@@ -460,12 +463,14 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
 .dialog-footnote { margin-top: 13px; color: #929d96; font-size: 11px; line-height: 1.5; }
 .button-danger-quiet { margin-right: auto; border-color: #f0e2df; color: #a25248; background: #fff; }
 .button-danger-quiet:hover { border-color: #e7cac4; background: #fff8f6; }
-
+/* ==========================================================================
+                              Responsive
+    ========================================================================== */
 @media (min-width: 1500px) {
   .main-content { padding-right: 56px; padding-left: 56px; }
   .board-layout { grid-template-columns: minmax(0, 1fr) 280px; gap: 25px; }
   .rates-table td { height: 76px; }
-}
+} /* Responsive adjustments for smaller screens */
 @media (max-width: 1150px) {
   .main-content { padding-right: 24px; padding-left: 24px; }
   .board-layout { grid-template-columns: minmax(0, 1fr) 235px; gap: 14px; }
@@ -475,7 +480,7 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
   .rates-table th:first-child, .rates-table td:first-child { padding-left: 12px; }
   .edit-price-button { gap: 3px; padding-right: 3px; padding-left: 3px; }
   .history-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+} 
 @media (max-width: 880px) {
   .sidebar { width: 66px; align-items: center; padding: 22px 8px 13px; }
   .brand { margin: 0 0 46px; }
@@ -548,7 +553,7 @@ body {
     radial-gradient(ellipse at 49% 58%, rgb(221 232 207 / 35%) 0, transparent 38%),
     #f3f6f1;
 }
-
+/* General luminous surfaces: soft colour stays behind the content for contrast. */
 .main-content { position: relative; }
 .status-card, .board-main, .pricing-card, .calc-card, .source-note, .history-section {
   backdrop-filter: blur(14px) saturate(118%);
@@ -561,6 +566,9 @@ body {
   box-shadow: 0 18px 42px rgb(37 74 56 / 9%), 0 0 0 1px rgb(122 164 102 / 28%), 0 0 26px rgb(143 183 122 / 15%);
 }
 
+/* ==========================================================================
+                              Markets section
+    ========================================================================== */
 .markets-section {
   --market-accent: #73a486;
   position: relative;
@@ -584,7 +592,7 @@ body {
   content: "";
   filter: blur(35px);
   pointer-events: none;
-}
+} /* .markets-section[hidden] { display: none !important; } */
 .markets-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
 .markets-heading .card-kicker { color: #718578; }
 .markets-heading .card-kicker span { padding: 0 3px; color: #a1b29f; }
@@ -609,7 +617,7 @@ body {
   backdrop-filter: blur(16px) saturate(122%);
   transition: transform .24s cubic-bezier(.2, .75, .25, 1), border-color .24s ease, box-shadow .24s ease;
   animation: enter-up .44s ease-out both;
-}
+} /* .market-card[hidden] { display: none !important; } */
 .market-card::before {
   position: absolute;
   inset: -30px -25px auto auto;
@@ -621,7 +629,7 @@ body {
   filter: blur(32px);
   transition: opacity .25s ease, transform .35s ease;
   pointer-events: none;
-}
+} /* The z-index of the card's children is raised above the ::before pseudo-element, so that the content is not obscured by the blurred background. */
 .market-card > * { position: relative; z-index: 1; }
 .market-card:hover { transform: translateY(-4px); border-color: rgb(var(--asset-tint) / 44%); box-shadow: 0 16px 32px rgb(var(--asset-tint) / 14%), 0 0 28px rgb(var(--asset-tint) / 18%); }
 .market-card:hover::before { transform: scale(1.22); }
@@ -657,7 +665,9 @@ body {
 .markets-footnote { display: flex; align-items: flex-start; gap: 9px; margin-top: 17px; padding: 11px 12px; border: 1px solid rgb(224 232 222 / 78%); border-radius: 9px; color: #718176; background: rgb(248 250 246 / 75%); }
 .markets-footnote-mark { display: grid; width: 17px; height: 17px; flex: 0 0 auto; place-items: center; border: 1px solid #b9cbae; border-radius: 50%; color: #6b8c5c; font: 600 10px "DM Mono", monospace; }
 .markets-footnote p { margin: 0; font-size: 11px; line-height: 1.5; }
-
+/* ==========================================================================
+                              Responsive
+    ========================================================================== */
 @media (max-width: 1050px) {
   .markets-section { padding: 21px 19px 16px; }
   .markets-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -678,13 +688,15 @@ body {
   .market-card:hover { transform: none; }
   .market-card::before { transition: none; }
 }
-
+/* ==========================================================================
+                              Night theme
+    ========================================================================== */
 body[data-theme="night"] {
   background:
     radial-gradient(ellipse at 83% 7%, rgb(39 75 58 / 52%) 0, transparent 32%),
     radial-gradient(ellipse at 48% 58%, rgb(48 65 55 / 37%) 0, transparent 38%),
     #101a18;
-}
+} /* Night theme luminous surfaces: soft colour stays behind the content for contrast. */
 body[data-theme="night"] .markets-section { border-color: #33473b; background: linear-gradient(145deg, rgb(25 39 32 / 94%), rgb(22 34 29 / 92%)); box-shadow: 0 20px 55px rgb(0 0 0 / 23%), 0 0 35px rgb(102 148 111 / 11%); }
 body[data-theme="night"] .markets-heading h2 { color: #e0ece4; }
 body[data-theme="night"] .markets-heading p, body[data-theme="night"] .markets-heading .card-kicker { color: #9bac9f; }
@@ -849,23 +861,23 @@ body[data-theme="night"] .button-secondary { border-color: #40564b; color: #d3e0
 body[data-theme="night"] .button-secondary:hover { border-color: #607c69; background: #263a31; }
 body[data-theme="night"] .button-danger-quiet { border-color: #63423d; color: #f0b3a7; background: #2c211f; }
 body[data-theme="night"] .button-danger-quiet:hover { border-color: #83564e; background: #3a2925; }
-
+/* Here we override the default grid layout for the display options to ensure that it remains usable on smaller screens. */
 @media (max-width: 1120px) {
   .display-options-grid { grid-template-columns: repeat(2, minmax(135px, 1fr)); }
 }
-
+/* And here we override the default grid layout for the display options to ensure that it remains usable on smaller screens. */
 body[data-theme="night"] {
   background:
     radial-gradient(ellipse at 83% 6%, rgb(34 69 53 / 50%) 0, transparent 36%),
     radial-gradient(ellipse at 46% 55%, rgb(42 57 49 / 34%) 0, transparent 39%),
     #101a18;
-}
+} /* Then we override the luminous surfaces to ensure that they remain usable on smaller screens. */
 body[data-theme="night"] .status-card, body[data-theme="night"] .board-main,
 body[data-theme="night"] .pricing-card, body[data-theme="night"] .calc-card,
 body[data-theme="night"] .source-note, body[data-theme="night"] .history-section {
   box-shadow: 0 16px 36px rgb(0 0 0 / 19%), 0 0 23px rgb(86 137 107 / 8%);
   backdrop-filter: blur(14px) saturate(118%);
-}
+} /* And finally we override the hover states for the luminous surfaces to ensure that they remain usable on smaller screens. */
 body[data-theme="night"] .status-card:hover, body[data-theme="night"] .calc-card:hover,
 body[data-theme="night"] .source-note:hover, body[data-theme="night"] .history-card:hover {
   box-shadow: 0 20px 42px rgb(0 0 0 / 25%), 0 0 26px rgb(112 159 119 / 13%);
