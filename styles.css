@@ -70,6 +70,9 @@ a { color: inherit; }
   to { background-position: -200% 0; }
 }
 
+/*  ==========================================================================
+                              Component styles
+    ========================================================================== */
 @media (prefers-reduced-motion: no-preference) {
   .sidebar { animation: enter-left .48s cubic-bezier(.2, .75, .25, 1) both; }
   .sidebar .brand { animation: enter-up .4s .08s ease-out both; }
@@ -89,10 +92,13 @@ a { color: inherit; }
   .right-rail > :nth-child(3) { animation-delay: .16s; }
 }
 
+/*  ==========================================================================
+                              Sidebar
+    ========================================================================== */
 .sidebar {
   position: fixed; z-index: 5; inset: 0 auto 0 0; width: 238px; display: flex; flex-direction: column;
   padding: 27px 17px 16px; background: linear-gradient(165deg, #173a35, #112a2b 72%); color: #e5eddf;
-}
+} /*  Sidebar brand  */
 .brand { display: flex; gap: 12px; align-items: center; width: fit-content; color: inherit; text-decoration: none; margin: 0 0 52px 4px; }
 .brand-mark { display: grid; grid-template-columns: repeat(2, 8px); grid-template-rows: repeat(2, 8px); gap: 3px; transform: rotate(-8deg); }
 .brand-mark span { border-radius: 2px; background: var(--lime); }
@@ -125,6 +131,9 @@ a { color: inherit; }
 .profile-copy span { color: #91a39a; font-size: 12px; }
 .profile-menu { margin-left: auto; color: #90a297; font-size: 16px; letter-spacing: 1px; }
 
+/*  ==========================================================================
+                              Main content
+    ========================================================================== */
 .main-content { max-width: 1700px; min-height: 100vh; margin-left: 238px; padding: 0 42px 0; }
 .topbar { height: 58px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); }
 .breadcrumb { display: flex; gap: 10px; align-items: center; color: #8c9692; font-size: 13px; }
@@ -158,6 +167,9 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
 .is-refreshing .refresh-icon { animation: rotate 1s linear infinite; }
 @keyframes rotate { to { transform: rotate(360deg); } }
 
+/*  ==========================================================================
+                              Status cards
+    ========================================================================== */
 .status-grid { display: grid; grid-template-columns: 1.07fr 1fr 1.05fr; gap: 11px; margin-bottom: 27px; }
 .status-card { min-height: 78px; display: flex; align-items: center; gap: 12px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 9px; background: #fff; transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease; }
 .status-card:hover { transform: translateY(-2px); border-color: #dce5d8; box-shadow: 0 8px 20px rgb(29 52 47 / 6%); }
@@ -181,6 +193,9 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
 .feed-alert { margin: -15px 0 22px; padding: 10px 13px; border: 1px solid #f0dfb7; border-radius: 5px; color: #77541a; background: #fff9ed; font-size: 13px; line-height: 1.5; }
 .feed-alert[data-kind="error"] { border-color: #eed0cc; color: #88463f; background: #fff3f1; }
 
+/*  ==========================================================================
+                              Board layout
+    ========================================================================== */
 .board-layout { display: grid; grid-template-columns: minmax(0, 1fr) 257px; gap: 22px; align-items: start; }
 .board-main { min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 7px 24px rgb(41 67 57 / 5%); }
 .board-toolbar { display: flex; justify-content: space-between; align-items: center; min-height: 77px; padding: 15px 17px 13px; border-bottom: 1px solid #edf0eb; }
@@ -267,7 +282,9 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
 .table-footnote a:hover { text-decoration: underline; }
 .empty-search { display: grid; justify-items: center; gap: 5px; padding: 42px 12px; color: #839089; font-size: 13px; }
 .empty-search strong { color: #3b5048; font-size: 15px; }
-
+/*  ==========================================================================
+                              Right rail
+    ========================================================================== */
 .right-rail { display: grid; gap: 12px; }
 .pricing-card { padding: 17px 15px 13px; border-radius: 7px; color: #eaf0e7; background: var(--forest); box-shadow: 0 8px 18px rgb(31 70 58 / 11%); transition: transform .24s ease, box-shadow .24s ease; }
 .pricing-card:hover { transform: translateY(-2px); box-shadow: 0 13px 24px rgb(31 70 58 / 15%); }
@@ -292,7 +309,9 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
 .button-full span { font-size: 17px; }
 .saved-locally { display: flex; justify-content: center; gap: 5px; align-items: center; margin-top: 10px; color: #a7b9aa; font-size: 11px; }
 .lock-icon { color: #c1d882; font-size: 14px; }
-
+/*  ==========================================================================
+                              Calculator
+    ========================================================================== */
 .calc-card, .source-note { transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease; }
 .calc-card { padding: 15px; border: 1px solid var(--line); border-radius: 7px; background: #fff; }
 .calc-card:hover, .source-note:hover { transform: translateY(-2px); border-color: #dfe7dc; box-shadow: 0 8px 19px rgb(29 52 47 / 6%); }
@@ -336,7 +355,9 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
 .page-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 30px; padding: 13px 0 18px; border-top: 1px solid var(--line); color: #9aa49e; font: 400 10px "DM Mono", monospace; letter-spacing: .55px; }
 .footer-divider { margin: 0 5px; color: #c6cdc6; }
 .page-footer > span:last-child { font: 400 11px "DM Sans", sans-serif; letter-spacing: 0; }
-
+/*  ==========================================================================
+                              History section
+    ========================================================================== */
 .history-section {
   --chart-line: #568367;
   --chart-grid: #e7eee8;
@@ -344,7 +365,7 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
   margin-top: 22px; padding: 23px; border: 1px solid var(--line); border-radius: 8px;
   background: var(--white); box-shadow: 0 8px 25px rgb(24 61 49 / 5%);
   animation: enter-up .48s .2s ease-out both;
-}
+} /* .history-section[hidden] { display: none !important; } */
 .history-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; }
 .history-heading .card-kicker { color: #798a7b; }
 .history-heading h2 { margin: 7px 0 4px; color: var(--ink); font: 700 22px/1.2 "Manrope", sans-serif; letter-spacing: -.55px; }
