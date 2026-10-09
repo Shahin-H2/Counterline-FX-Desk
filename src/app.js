@@ -727,7 +727,7 @@ function refreshCalculatorReference(id, { force = false } = {}) {
     })  // Handle any errors that occur during the fetch or response processing, marking the lookup state as "cached" or "error" as appropriate, and re-rendering the calculator if the current pair matches the requested pair.
     .catch(() => {
       calculatorLookupState.set(id, referenceRates[id] ? "cached" : "error");
-      if (currentCalculatorPair() === id) renderCalculator();
+      if (currentCalculatorPair() === id) renderCalculator(); 
     });
 }
 
@@ -739,8 +739,8 @@ function changeCalculatorCurrencies(changed) {
     const previousAlternate = changed === "base" ? previousCalculatorSelection.base : previousCalculatorSelection.quote;
     const alternate = previousAlternate !== currentCode && currenciesAvailable.includes(previousAlternate)
       ? previousAlternate
-      : currenciesAvailable.find((code) => code !== currentCode);
-    if (changed === "base") elements.calculatorQuote.value = alternate ?? "";
+      : currenciesAvailable.find((code) => code !== currentCode); 
+    if (changed === "base") elements.calculatorQuote.value = alternate ?? ""; 
     else elements.calculatorBase.value = alternate ?? "";
   } // If the user selects the same currency for both base and quote, automatically switch the other selector to a different available currency.
   previousCalculatorSelection = { base: elements.calculatorBase.value, quote: elements.calculatorQuote.value };
