@@ -353,6 +353,7 @@ function currentStalePairs() {
   });
 }
 
+// Update the feed status based on the current reference rates, cache status, and any errors or missing pairs. This function determines the appropriate label and state for the feed pill, updates the rate date and checked at information, and displays any relevant alerts to the user.
 function updateFeedStatus() {
   const boardRates = settings.pairs.map((id) => referenceRates[id]).filter(Boolean);
   const ratesAvailable = boardRates.length > 0;
@@ -363,6 +364,7 @@ function updateFeedStatus() {
   let label = "Live lookup";
   let state = "fresh";
 
+  // Determine the appropriate label and state for the feed pill based on the availability of rates, cache status, and any errors or missing pairs.
   if (!ratesAvailable) {
     label = metalProviderNeeded ? "Source needed" : referenceMeta.cacheStatus === "error" || hasErrors ? "Unavailable" : "Waiting";
     state = "error";
@@ -386,6 +388,7 @@ function updateFeedStatus() {
     state = "fresh";
   }
 
+  // Update the feed pill in the navigation bar and sidebar with the determined label and state.
   setFeedPill(label, state);
   if (!ratesAvailable) {
     elements.rateDate.textContent = "No reference data";
