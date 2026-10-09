@@ -639,12 +639,14 @@ function renderCalculatorOptions() {
   renderCalculator();
 }
 
+// Get the currently selected calculator pair as a string in the format "BASE/QUOTE", or return an empty string if the selection is invalid (e.g., if the base and quote are the same or not selected).
 function currentCalculatorPair() {
   const base = elements.calculatorBase.value;
   const quote = elements.calculatorQuote.value;
   return base && quote && base !== quote ? `${base}/${quote}` : "";
 }
 
+// Render the calculator results based on the currently selected base and quote currencies, the entered amount, and the available reference rates and customer prices. This function updates the UI with the calculated results or appropriate messages if data is missing or invalid.
 function renderCalculator() {
   const id = currentCalculatorPair();
   if (!id) {
@@ -655,7 +657,7 @@ function renderCalculator() {
     elements.calculatorSellResult.textContent = "Choose a pair";
     elements.calculatorAddPair.hidden = true;
     return;
-  }
+  } // If the selected pair is invalid (e.g., base and quote are the same), display a message prompting the user to choose two different currencies.
   const { base, quote } = pairParts(id);
   const metalPair = isMetalPair(base, quote);
   const metalDirectionSupported = isSupportedPair(base, quote);
