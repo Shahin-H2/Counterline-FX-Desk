@@ -400,6 +400,7 @@ function updateFeedStatus() {
     elements.checkedAt.textContent = `${referenceMeta.cacheStatus === "stale-cache" ? "Last successful fetch" : "Checked"} ${formatCheckedAt(referenceMeta.cacheStatus === "stale-cache" ? referenceMeta.retrievedAt : referenceMeta.checkedAt)} · pair dates shown below`;
   }
 
+  // Determine the appropriate alert message and kind based on the current state of the reference rates, cache status, and any errors or missing pairs. This message will be displayed to the user in the feed alert area.
   let alertText = "";
   let alertKind = "warning";
   if (!ratesAvailable) {
