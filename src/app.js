@@ -695,6 +695,7 @@ function renderCalculator() {
   elements.calculatorAddPair.hidden = onBoard;
 }
 
+// Refresh the reference rate for a given currency pair, fetching it from the server if it is not already cached or if a forced refresh is requested. This function updates the lookup state and re-renders the calculator as needed.
 function refreshCalculatorReference(id, { force = false } = {}) {
   if (!id || (!force && calculatorLookupState.has(id))) return;
   const { base, quote } = pairParts(id);
@@ -702,7 +703,7 @@ function refreshCalculatorReference(id, { force = false } = {}) {
     calculatorLookupState.set(id, "missing");
     renderCalculator();
     return;
-  }
+  } // If the pair is not supported (e.g., gold or silver without USD), mark it as missing and re-render the calculator.
   calculatorLookupState.set(id, "loading");
   renderCalculator();
   const pair = pairParts(id);
@@ -711,7 +712,7 @@ function refreshCalculatorReference(id, { force = false } = {}) {
     .then(async (response) => {
       if (!response.ok) throw new Error("Reference lookup failed");
       return response.json();
-    })
+    })  // Validate the response body to ensure it contains the expected structure and data for the requested currency pair.
     .then((body) => {
       const rate = body.rates?.[id];
       if (rate) {
@@ -723,13 +724,14 @@ function refreshCalculatorReference(id, { force = false } = {}) {
         calculatorLookupState.set(id, referenceRates[id] ? "cached" : "missing");
       }
       if (currentCalculatorPair() === id) renderCalculator();
-    })
+    })  // Handle any errors that occur during the fetch or response processing, marking the lookup state as "cached" or "error" as appropriate, and re-rendering the calculator if the current pair matches the requested pair.
     .catch(() => {
       calculatorLookupState.set(id, referenceRates[id] ? "cached" : "error");
       if (currentCalculatorPair() === id) renderCalculator();
     });
 }
 
+// Handle changes to the calculator's base or quote currency selectors, ensuring that the two currencies are not the same and updating the calculator results accordingly. If the user selects the same currency for both base and quote, automatically switch the other selector to a different available currency.
 function changeCalculatorCurrencies(changed) {
   if (elements.calculatorBase.value === elements.calculatorQuote.value) {
     const currenciesAvailable = [...elements.calculatorBase.options].map((option) => option.value);
@@ -740,13 +742,14 @@ function changeCalculatorCurrencies(changed) {
       : currenciesAvailable.find((code) => code !== currentCode);
     if (changed === "base") elements.calculatorQuote.value = alternate ?? "";
     else elements.calculatorBase.value = alternate ?? "";
-  }
+  } // If the user selects the same currency for both base and quote, automatically switch the other selector to a different available currency.
   previousCalculatorSelection = { base: elements.calculatorBase.value, quote: elements.calculatorQuote.value };
   const id = currentCalculatorPair();
   renderCalculator();
   refreshCalculatorReference(id);
 }
 
+// Add the currently selected calculator pair to the rates board, validating that it is a supported pair and that the board has not reached its maximum capacity. If the pair is successfully added, save the settings and update the UI accordingly.
 function addCalculatorPairToBoard() {
   const id = currentCalculatorPair();
   if (!id || settings.pairs.includes(id)) return;
@@ -754,11 +757,11 @@ function addCalculatorPairToBoard() {
   if (!isSupportedPair(base, quote)) {
     announce("Gold and silver pairs can only be added against USD.");
     return;
-  }
+  } // Validate that the selected pair is supported (e.g., gold and silver must be paired with USD) before adding it to the board.
   if (settings.pairs.length >= MAX_BOARD_PAIRS) {
     announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`);
     return;
-  }
+  } // Check if the board has reached its maximum capacity before adding the new pair.
   settings.pairs.push(id);
   const saved = saveSettings();
   renderTable({ animatePair: id, highlightPair: id });
@@ -768,7 +771,7 @@ function addCalculatorPairToBoard() {
     ? `${id} added. The reference quote will appear after a metals source is configured.`
     : saved ? `${id} added to the rates board.` : `${id} added for this session; browser storage is unavailable.`);
 }
-
+// Reorder a currency pair on the board by moving it before or after another specified pair. This function updates the settings, applies view preferences, saves the changes, and re-renders the table. It also manages focus restoration for accessibility.
 function reorderPair(sourceId, targetId, afterTarget = false, { restoreFocus = true } = {}) {
   if (sourceId === targetId) return;
   const sourceIndex = settings.pairs.indexOf(sourceId);
@@ -788,6 +791,7 @@ function reorderPair(sourceId, targetId, afterTarget = false, { restoreFocus = t
   announce(saved ? "Currency pair order saved." : "Currency pair order changed for this session; browser storage is unavailable.");
 }
 
+// Move a currency pair up or down in the board order, ensuring that the move is valid and within the bounds of the current pairs. This function calls reorderPair to perform the actual reordering.
 function movePairInBoard(id, direction) {
   const index = settings.pairs.indexOf(id);
   const targetIndex = index + (direction === "up" ? -1 : 1);
@@ -795,6 +799,7 @@ function movePairInBoard(id, direction) {
   reorderPair(id, settings.pairs[targetIndex], direction === "down");
 }
 
+// Flip the direction of a currency pair on the board, changing it from "BASE/QUOTE" to "QUOTE/BASE". This function checks for existing pairs, updates the settings, saves the changes, and re-renders the table. It also updates the calculator if the flipped pair is currently selected.
 function flipPairDirection(id) {
   const index = settings.pairs.indexOf(id);
   if (index < 0) return;
@@ -803,14 +808,14 @@ function flipPairDirection(id) {
   if (settings.pairs.includes(flippedId)) {
     announce(`${flippedId} is already on the board.`);
     return;
-  }
+  } // Check if the flipped pair already exists on the board to prevent duplicates.
   settings.pairs[index] = flippedId;
   const saved = saveSettings();
   if (currentCalculatorPair() === id) {
     elements.calculatorBase.value = quote;
     elements.calculatorQuote.value = base;
     previousCalculatorSelection = { base: quote, quote: base };
-  }
+  } // If the flipped pair is currently selected in the calculator, update the calculator selectors to reflect the new base and quote currencies.
   renderTable({ highlightPair: flippedId });
   loadRates();
   loadPairHistory();
@@ -819,6 +824,7 @@ function flipPairDirection(id) {
     : `${id} direction changed for this session. Desk prices remain separate for each direction.`);
 }
 
+// Apply the current view preferences (theme, density, filter, sort) to the document body and relevant UI elements. Optionally persist the preferences to localStorage for future sessions.
 function applyViewPreferences({ persist = true } = {}) {
   document.body.dataset.theme = view.theme;
   document.body.dataset.density = view.density;
@@ -829,6 +835,7 @@ function applyViewPreferences({ persist = true } = {}) {
   if (persist) writeJson(VIEW_STORAGE_KEY, view);
 }
 
+// Open the dialog for adding a new currency pair, populating the base and quote selectors with available currencies and metals. This function also sets default selections based on preferred currencies and updates the pair preview accordingly.
 function openPairDialog() {
   if (settings.pairs.length >= MAX_BOARD_PAIRS) {
     announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`);
