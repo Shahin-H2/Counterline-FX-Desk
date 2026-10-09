@@ -1,3 +1,6 @@
+/*  ==========================================================================
+                              Base styles
+    ========================================================================== */
 :root {
   color-scheme: light;
   --ink: #142d2b;
@@ -23,6 +26,9 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/*  ==========================================================================
+                              Global styles
+    ========================================================================== */
 * { box-sizing: border-box; }
 html { min-width: 320px; scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; background: radial-gradient(ellipse at 82% 0%, #e6efe2 0, transparent 34%), var(--paper); color: var(--ink); transition: background-color .25s ease, color .25s ease; }
@@ -31,8 +37,12 @@ button { cursor: pointer; }
 a { color: inherit; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 
+/*  Layout helpers */
 .app-shell { min-height: 100vh; }
 
+/*  ==========================================================================
+                              Animations
+    ========================================================================== */
 @keyframes enter-left {
   from { opacity: 0; transform: translateX(-14px); }
   to { opacity: 1; transform: translateX(0); }
