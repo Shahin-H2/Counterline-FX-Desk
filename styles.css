@@ -652,6 +652,7 @@ body {
 .market-card-name h3 { margin: 0; color: #294136; font: 700 16px/1.2 "Manrope", sans-serif; letter-spacing: -.3px; }
 .market-card-name > span { overflow: hidden; color: #89978c; font: 400 10px "DM Mono", monospace; text-overflow: ellipsis; white-space: nowrap; }
 .market-value { margin-top: 13px; color: #263f34; font: 700 27px/1.1 "Manrope", sans-serif; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.market-value-unavailable { color: #8a968b; font: 600 14px/1.3 "DM Sans", sans-serif; letter-spacing: 0; }
 .market-unit { margin-top: 4px; color: #89968b; font-size: 11px; }
 .market-unit span { padding: 0 3px; color: #b3beb2; }
 .market-card-bottom { align-items: flex-end; margin-top: auto; padding-top: 12px; }
@@ -861,6 +862,52 @@ body[data-theme="night"] .button-secondary { border-color: #40564b; color: #d3e0
 body[data-theme="night"] .button-secondary:hover { border-color: #607c69; background: #263a31; }
 body[data-theme="night"] .button-danger-quiet { border-color: #63423d; color: #f0b3a7; background: #2c211f; }
 body[data-theme="night"] .button-danger-quiet:hover { border-color: #83564e; background: #3a2925; }
+
+/* Persistent theme switch and the metals history frame. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 31px;
+  padding: 0 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: var(--white);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: border-color .18s ease, color .18s ease, background .18s ease, transform .18s ease;
+}
+.theme-toggle:hover { transform: translateY(-1px); border-color: #a9bea7; }
+.theme-toggle:active { transform: scale(.97); }
+.theme-toggle:focus-visible { outline: 3px solid rgb(152 184 96 / 35%); outline-offset: 2px; }
+.theme-icon { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
+.theme-icon-sun { display: none; }
+body[data-theme="night"] .theme-toggle { border-color: #40564b; color: #d5e4d8; background: #1d2c27; }
+body[data-theme="night"] .theme-toggle:hover { border-color: #67866e; background: #263a31; }
+body[data-theme="night"] .theme-icon-moon { display: none; }
+body[data-theme="night"] .theme-icon-sun { display: block; }
+body[data-theme="night"] .market-value-unavailable { color: #b1c1b5; }
+
+.market-history-section { position: relative; isolation: isolate; margin-top: 20px; overflow: hidden; }
+.market-history-section::before { position: absolute; z-index: 0; inset: -12px 15% auto; height: 92px; border-radius: 50%; background: linear-gradient(90deg, rgb(190 155 83 / 22%), rgb(137 165 183 / 24%), rgb(149 158 197 / 20%)); content: ""; filter: blur(34px); pointer-events: none; }
+.market-history-section > * { position: relative; z-index: 1; }
+.market-history-grid .history-card { min-height: 270px; }
+.market-diamond-history { --chart-line: #8885bc; }
+body[data-theme="night"] .market-history-section::before { opacity: .45; }
+body[data-theme="night"] .market-diamond-history .history-empty-icon { border-color: #4c4a70; color: #c8c4f1; background: #2a293d; }
+@media (max-width: 620px) {
+  .topbar { gap: 6px; }
+  .breadcrumb { gap: 5px; font-size: 11px; }
+  .topbar-right { gap: 7px; }
+  .theme-toggle { min-height: 29px; padding: 0 8px; font-size: 10px; }
+  .local-label { display: none; }
+}
+@media (max-width: 390px) {
+  .theme-toggle { width: 31px; justify-content: center; padding: 0; }
+  .theme-toggle > span { display: none; }
+}
 /* Here we override the default grid layout for the display options to ensure that it remains usable on smaller screens. */
 @media (max-width: 1120px) {
   .display-options-grid { grid-template-columns: repeat(2, minmax(135px, 1fr)); }
