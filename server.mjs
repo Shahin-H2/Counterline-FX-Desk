@@ -199,7 +199,7 @@ const server = createServer(async (request, response) => {
       const currencyPairs = pairs.filter(({ base, quote }) => ![base, quote].some((code) => code === "XAU" || code === "XAG"));
       const payload = currencyPairs.length
         ? await fetchFrankfurterHistory(currencyPairs, { from, to })
-        : { source: "Metals history not configured", from, to, rates: {}, errors: [] };
+        : { source: "", from, to, rates: {}, errors: [] };
       if (metalPairs.length && twelveData.isConfigured()) {
         const results = await Promise.allSettled(metalPairs.map(({ base, quote }) => twelveData.getHistory(base, quote, range)));
         results.forEach((result, index) => {
@@ -211,7 +211,9 @@ const server = createServer(async (request, response) => {
             payload.errors.push({ code: "provider-request-failed", pair: key, message: "Twelve Data did not return observations for this metal pair." });
           }
         });
-        payload.source = `${payload.source} · Twelve Data metals`;
+        payload.source = payload.source
+          ? `${payload.source} · Twelve Data metals`
+          : "Twelve Data precious-metal history";
       } else if (metalPairs.length) {
         for (const { base, quote } of metalPairs) payload.rates[`${base}/${quote}`] = [];
         payload.errors.push({ code: "provider-not-configured", message: twelveData.configurationMessage() });
