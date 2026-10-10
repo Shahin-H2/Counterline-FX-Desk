@@ -17,9 +17,16 @@ function validSymbol(value) {
 
 function normalizeDatetime(value) {
   if (typeof value !== "string") return null;
-  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? `${value}T00:00:00.000Z`
-    : `${value.replace(" ", "T")}Z`;
+  const isoLike = value.replace(" ", "T");
+  let normalized = isoLike;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoLike)) {
+    normalized = `${isoLike}T00:00:00.000Z`;
+  } else if (!/Z$/i.test(isoLike)) {
+    const offset = /([+-])(\d{2}):?(\d{2})$/.exec(isoLike);
+    normalized = offset
+      ? isoLike.replace(/([+-])(\d{2}):?(\d{2})$/, "$1$2:$3")
+      : `${isoLike}Z`;
+  }
   const date = new Date(normalized);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
