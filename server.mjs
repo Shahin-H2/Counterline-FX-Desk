@@ -11,7 +11,7 @@ async function loadMarketEnvironment() {
   try {
     const lines = await readFile(resolve(root, ".env"), "utf8");
     for (const line of lines.split(/\r?\n/)) {
-      const match = /^\s*(TWELVEDATA_API_KEY|TWELVEDATA_EXTERNAL_DISPLAY_LICENSE)\s*=\s*(.*?)\s*$/.exec(line);
+      const match = /^\s*(TWELVE_DATA_API_KEY|TWELVEDATA_API_KEY|TWELVEDATA_EXTERNAL_DISPLAY_LICENSE)\s*=\s*(.*?)\s*$/.exec(line);
       if (!match || process.env[match[1]]) continue;
       const value = match[2].replace(/^(['"])(.*)\1$/, "$2");
       process.env[match[1]] = value;
@@ -103,13 +103,17 @@ const server = createServer(async (request, response) => {
       if (supportedMetalPairs.length && !twelveData.isConfigured()) {
         errors.push({ code: "provider-not-configured", message: twelveData.configurationMessage() });
       } else if (supportedMetalPairs.length) {
-        const metalResults = await Promise.allSettled(supportedMetalPairs.map(({ base, quote }) => twelveData.getRate(base, quote)));
-        metalResults.forEach((result, index) => {
-          const pair = supportedMetalPairs[index];
+        const metalPayload = await twelveData.getHistories(supportedMetalPairs, "5min");
+        for (const pair of supportedMetalPairs) {
           const key = `${pair.base}/${pair.quote}`;
-          if (result.status === "fulfilled") rates[key] = result.value;
-          else errors.push({ code: "provider-request-failed", pair: key, message: "Twelve Data did not return a recent observation for this metal pair." });
-        });
+          const latest = metalPayload.rates[key]?.at(-1);
+          if (latest) {
+            rates[key] = { ...latest, base: pair.base, quote: pair.quote, source: "Twelve Data" };
+          } else {
+            const providerError = metalPayload.errors.find((error) => error.symbol === `${pair.base}/${pair.quote}`);
+            errors.push({ code: "provider-request-failed", pair: key, message: providerError?.message ?? "Twelve Data did not return a recent observation for this metal pair." });
+          }
+        }
       }
       if (unsupportedMetalPairs.length) errors.push({ code: "unsupported-metal-pair", message: "Gold and silver are currently supported against USD only." });
       sendJson(response, 200, {
@@ -161,13 +165,13 @@ const server = createServer(async (request, response) => {
     if (INTRADAY_HISTORY_RANGES.has(range)) {
       const rates = Object.fromEntries(pairs.map(({ base, quote }) => [`${base}/${quote}`, []]));
       if (twelveData.isConfigured()) {
-        const results = await Promise.allSettled(pairs.map(({ base, quote }) => twelveData.getHistory(base, quote, range)));
-        const errors = [];
-        results.forEach((result, index) => {
-          const key = `${pairs[index].base}/${pairs[index].quote}`;
-          if (result.status === "fulfilled") rates[key] = result.value;
-          else errors.push({ code: "provider-request-failed", pair: key, message: "Twelve Data did not return observations for this pair and range." });
-        });
+        const historyPayload = await twelveData.getHistories(pairs, range);
+        Object.assign(rates, historyPayload.rates);
+        const errors = historyPayload.errors.map((error) => ({
+          code: "provider-request-failed",
+          pair: error.symbol,
+          message: error.message,
+        }));
         sendJson(response, 200, {
           source: "Twelve Data intraday reference data",
           interval: range === "5min" ? "one-minute" : "hourly",
@@ -201,16 +205,13 @@ const server = createServer(async (request, response) => {
         ? await fetchFrankfurterHistory(currencyPairs, { from, to })
         : { source: "", from, to, rates: {}, errors: [] };
       if (metalPairs.length && twelveData.isConfigured()) {
-        const results = await Promise.allSettled(metalPairs.map(({ base, quote }) => twelveData.getHistory(base, quote, range)));
-        results.forEach((result, index) => {
-          const { base, quote } = metalPairs[index];
-          const key = `${base}/${quote}`;
-          if (result.status === "fulfilled") payload.rates[key] = result.value;
-          else {
-            payload.rates[key] = [];
-            payload.errors.push({ code: "provider-request-failed", pair: key, message: "Twelve Data did not return observations for this metal pair." });
-          }
-        });
+        const metalHistory = await twelveData.getHistories(metalPairs, range);
+        Object.assign(payload.rates, metalHistory.rates);
+        payload.errors.push(...metalHistory.errors.map((error) => ({
+          code: "provider-request-failed",
+          pair: error.symbol,
+          message: error.message,
+        })));
         payload.source = payload.source
           ? `${payload.source} · Twelve Data metals`
           : "Twelve Data precious-metal history";
@@ -219,7 +220,7 @@ const server = createServer(async (request, response) => {
         payload.errors.push({ code: "provider-not-configured", message: twelveData.configurationMessage() });
       }
       if (Object.values(payload.rates).some((observations) => observations.length)) {
-        historyCache.set(key, { payload, expiresAt: now + 15 * 60 * 1000 });
+        historyCache.set(key, { payload, expiresAt: now + 5 * 60 * 1000 });
       }
       sendJson(response, 200, { ...payload, cacheStatus: "fresh" });
     } catch {
@@ -249,17 +250,13 @@ const server = createServer(async (request, response) => {
       });
       return;
     }
-    const results = await Promise.allSettled(requestedAssets.map((asset) => twelveData.getHistory(asset, "USD", range)));
-    const rates = {};
-    const errors = [];
-    results.forEach((result, index) => {
-      const code = requestedAssets[index];
-      if (result.status === "fulfilled") rates[code] = result.value;
-      else {
-        rates[code] = [];
-        errors.push({ code: "provider-request-failed", asset: code, message: "Twelve Data did not return observations for this metal and range." });
-      }
-    });
+    const historyPayload = await twelveData.getHistories(requestedAssets.map((asset) => ({ base: asset, quote: "USD" })), range);
+    const rates = Object.fromEntries(requestedAssets.map((asset) => [asset, historyPayload.rates[`${asset}/USD`] ?? []]));
+    const errors = historyPayload.errors.map((error) => ({
+      code: "provider-request-failed",
+      asset: error.symbol?.split("/")[0],
+      message: error.message,
+    }));
     sendJson(response, 200, {
       source: "Twelve Data · precious metal spot reference",
       rates,
