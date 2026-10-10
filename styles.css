@@ -383,6 +383,11 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
 .history-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .history-card { min-width: 0; padding: 15px 15px 12px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #fcfdfa; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; animation: enter-up .38s ease-out both; }
 .history-card:hover { transform: translateY(-2px); border-color: #cbdaca; box-shadow: 0 9px 22px rgb(24 61 49 / 8%); }
+.history-card[draggable="true"] { cursor: grab; user-select: none; }
+.history-card.is-dragging { z-index: 5; cursor: grabbing; opacity: .7; transform: scale(1.02); border-color: #8ca77e; box-shadow: 0 18px 34px rgb(24 61 49 / 20%); animation: none; }
+.history-card-drop-target { border-color: #8ca77e; box-shadow: 0 0 0 2px rgb(140 167 126 / 18%); }
+.history-card-interpolated { border-style: dashed; }
+.history-card-interpolated .history-observation-count { max-width: 132px; color: #81652f; background: #f6f0df; font: 600 8px/1.25 "DM Mono", monospace; letter-spacing: .15px; white-space: normal; text-align: center; }
 .history-card-loading:hover { transform: none; box-shadow: none; }
 .history-card-loading > * { border-radius: 4px; background: linear-gradient(100deg, #f0f4ef 30%, #e7eee6 45%, #f0f4ef 60%); background-size: 200% 100%; animation: chart-shimmer 1.25s ease-in-out infinite; }
 .history-loading-line { width: 46%; height: 16px; }
@@ -739,6 +744,9 @@ body[data-theme="night"] .history-resolution-note { border-color: #35493e; color
 body[data-theme="night"] .history-resolution-note > span { color: #b5d388; }
 body[data-theme="night"] .history-card { border-color: #304239; background: #1c2a25; }
 body[data-theme="night"] .history-card:hover { border-color: #4a6352; box-shadow: 0 9px 22px rgb(0 0 0 / 18%); }
+body[data-theme="night"] .history-card.is-dragging { border-color: #9cba7d; box-shadow: 0 18px 34px rgb(0 0 0 / 32%); }
+body[data-theme="night"] .history-card-drop-target { border-color: #9cba7d; box-shadow: 0 0 0 2px rgb(156 186 125 / 20%); }
+body[data-theme="night"] .history-card-interpolated .history-observation-count { color: #e5ca88; background: #403927; }
 body[data-theme="night"] .history-card-loading > * { background: linear-gradient(100deg, #26362e 30%, #304339 45%, #26362e 60%); background-size: 200% 100%; }
 body[data-theme="night"] .history-latest, body[data-theme="night"] .history-latest small { color: #9aada0; }
 body[data-theme="night"] .history-latest strong { color: #c9e2a5; }
