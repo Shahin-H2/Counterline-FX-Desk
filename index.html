@@ -246,7 +246,7 @@
               <button class="history-range" type="button" data-history-range="6m" aria-pressed="false">6 months</button>
             </div>
           </header>
-          <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span> The current source publishes daily observations. 24-hour and 5-minute charts need an intraday feed; the graph will only plot observations supplied by its source.</p>
+          <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span> Daily currency history uses Frankfurter. Twelve Data supplies 1-minute and hourly FX history when a licensed API key is configured. Charts only plot observations returned by the source.</p>
           <div class="history-status" id="history-status" role="status" aria-live="polite">Loading daily history…</div>
           <div class="history-grid" id="history-grid" role="list" aria-label="Currency pair history charts"></div>
         </section>
@@ -265,24 +265,17 @@
           </header>
 
           <div class="markets-grid" id="markets-grid" role="list" aria-label="Commodity reference rates">
-            <article class="market-card market-card-gold" role="listitem">
+            <article class="market-card market-card-gold" data-market-code="XAU" role="listitem">
               <div class="market-card-top"><span class="market-symbol">Au</span><span class="market-kind">PRECIOUS METAL</span></div>
               <div class="market-card-name"><h3>Gold</h3><span>XAU</span></div>
-              <div class="market-value market-value-unavailable">Source needed</div>
+              <div class="market-value market-value-unavailable" data-market-value>Source needed</div>
               <div class="market-unit">USD <span>·</span> per troy ounce</div>
               <div class="market-card-bottom"><span class="market-change market-change-pending">Feed required</span><span class="market-observation">No source selected</span></div>
             </article>
-            <article class="market-card market-card-silver" role="listitem">
+            <article class="market-card market-card-silver" data-market-code="XAG" role="listitem">
               <div class="market-card-top"><span class="market-symbol">Ag</span><span class="market-kind">PRECIOUS METAL</span></div>
               <div class="market-card-name"><h3>Silver</h3><span>XAG</span></div>
-              <div class="market-value market-value-unavailable">Source needed</div>
-              <div class="market-unit">USD <span>·</span> per troy ounce</div>
-              <div class="market-card-bottom"><span class="market-change market-change-pending">Feed required</span><span class="market-observation">No source selected</span></div>
-            </article>
-            <article class="market-card market-card-platinum" role="listitem">
-              <div class="market-card-top"><span class="market-symbol">Pt</span><span class="market-kind">PRECIOUS METAL</span></div>
-              <div class="market-card-name"><h3>Platinum</h3><span>XPT</span></div>
-              <div class="market-value market-value-unavailable">Source needed</div>
+              <div class="market-value market-value-unavailable" data-market-value>Source needed</div>
               <div class="market-unit">USD <span>·</span> per troy ounce</div>
               <div class="market-card-bottom"><span class="market-change market-change-pending">Feed required</span><span class="market-observation">No source selected</span></div>
             </article>
@@ -300,18 +293,11 @@
               <div class="market-unit">USD <span>·</span> per barrel</div>
               <div class="market-card-bottom"><span class="market-change market-change-pending">Feed required</span><span class="market-observation">No source selected</span></div>
             </article>
-            <article class="market-card market-card-diamond" role="listitem">
-              <div class="market-card-top"><span class="market-symbol">◇</span><span class="market-kind">GEMSTONE</span></div>
-              <div class="market-card-name"><h3>Diamond</h3><span>Grade-specific</span></div>
-              <div class="diamond-explainer">No single spot rate</div>
-              <div class="diamond-detail">Value depends on carat, cut, colour, clarity and whether it is natural or lab-grown.</div>
-              <div class="market-card-bottom"><span class="market-change market-change-pending">Benchmark required</span><span class="market-observation">No universal quote</span></div>
-            </article>
           </div>
 
           <footer class="markets-footnote">
             <span class="markets-footnote-mark" aria-hidden="true">i</span>
-            <p>These are reference-market ideas, not counter offers. Metals and oil need separate data providers. Diamond prices depend on a specification and a licensed benchmark.</p>
+            <p>Reference-market values are not counter offers. Gold and silver use <a href="https://twelvedata.com/" target="_blank" rel="noreferrer">Twelve Data</a> when a licensed source is configured. Oil needs a separate source.</p>
           </footer>
         </section>
 
@@ -319,8 +305,8 @@
           <header class="history-header">
             <div class="history-heading">
               <div class="card-kicker">PRECIOUS METAL MOVEMENT</div>
-              <h2 id="market-history-title">Metal price history</h2>
-              <p>Gold, silver and platinum per troy ounce. Diamond prices need a selected grade and benchmark.</p>
+              <h2 id="market-history-title">Gold &amp; silver price history</h2>
+              <p>Reference prices in USD per troy ounce.</p>
             </div>
             <div class="history-controls market-history-controls" role="group" aria-label="Metal chart time range" aria-describedby="market-history-resolution-note">
               <button class="history-range" type="button" data-market-history-range="5min" aria-pressed="false">5 min</button>
@@ -331,9 +317,9 @@
               <button class="history-range" type="button" data-market-history-range="6m" aria-pressed="false">6 months</button>
             </div>
           </header>
-          <p class="history-resolution-note" id="market-history-resolution-note"><span aria-hidden="true">ⓘ</span> Metal history appears here when a metals data provider is configured. Diamond charts require a licensed grade-specific benchmark.</p>
+          <p class="history-resolution-note" id="market-history-resolution-note"><span aria-hidden="true">ⓘ</span> Twelve Data supplies gold and silver history, including minute and hourly observations, when a licensed API key is configured.</p>
           <div class="history-status" id="market-history-status" role="status" aria-live="polite">No metals history source selected.</div>
-          <div class="history-grid market-history-grid" id="market-history-grid" role="list" aria-label="Precious metal and diamond history charts"></div>
+          <div class="history-grid market-history-grid" id="market-history-grid" role="list" aria-label="Gold and silver history charts"></div>
         </section>
 
         <footer class="page-footer"><span>COUNTERLINE <span class="footer-divider">/</span> FX DESK</span><span>Reference data for operational context only.</span></footer>
