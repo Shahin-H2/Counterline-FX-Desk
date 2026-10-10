@@ -57,6 +57,8 @@ const elements = {
   pairSort: document.querySelector("#pair-sort"), // the select input for sorting pairs
   boardDensity: document.querySelector("#board-density"), // the select input for changing the density of the board
   boardTheme: document.querySelector("#board-theme"), // the select input for changing the theme of the board
+  themeToggle: document.querySelector("#theme-toggle"),
+  themeToggleLabel: document.querySelector("#theme-toggle-label"),
   resetDisplayOptions: document.querySelector("#reset-display-options"), // the button to reset display options to default
   pairDialog: document.querySelector("#pair-dialog"), // the dialog for adding a new pair
   pairForm: document.querySelector("#pair-form"), // the form inside the pair dialog
@@ -88,6 +90,9 @@ const elements = {
   historyGrid: document.querySelector("#history-grid"), // the container for the history charts
   historyStatus: document.querySelector("#history-status"), // the element showing the status of the history loading
   historyRanges: document.querySelector(".history-controls"), // the container for the history range buttons
+  marketHistoryGrid: document.querySelector("#market-history-grid"),
+  marketHistoryStatus: document.querySelector("#market-history-status"),
+  marketHistoryRanges: document.querySelector(".market-history-controls"),
   announcements: document.querySelector("#announcements"), // the live region for announcing changes to screen readers
 };
 
@@ -178,6 +183,17 @@ let historyRange = "1m";
 let pairHistory = {};
 let historyRequestId = 0;
 let historyLoading = false;
+let historyUnavailableReason = "";
+let marketHistoryRange = "1m";
+let marketHistory = {};
+let marketHistoryRequestId = 0;
+let marketHistoryLoading = false;
+let marketHistoryUnavailableReason = "No metals history source is configured.";
+const MARKET_HISTORY_ASSETS = [
+  { code: "XAU", name: "Gold", detail: "USD per troy ounce" },
+  { code: "XAG", name: "Silver", detail: "USD per troy ounce" },
+  { code: "XPT", name: "Platinum", detail: "USD per troy ounce" },
+];
 
 // Helper functions
 function pairParts(id) {
@@ -256,9 +272,31 @@ function formatDate(
   },
 ) {
   if (!dateString) return "Date unavailable";
-  const date = new Date(`${dateString.slice(0, 10)}T00:00:00Z`);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateString)
+    ? new Date(`${dateString}T00:00:00Z`)
+    : new Date(dateString);
   if (Number.isNaN(date.getTime())) return "Date unavailable";
   return new Intl.DateTimeFormat(locale, options).format(date);
+}
+
+function formatHistoryAxis(value, range) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return formatDate(value, { month: "short", day: "numeric", timeZone: "UTC" });
+  }
+  const options = range === "5min"
+    ? { hour: "2-digit", minute: "2-digit", second: "2-digit" }
+    : range === "24h"
+      ? { hour: "numeric", minute: "2-digit" }
+      : { month: "short", day: "numeric" };
+  return new Intl.DateTimeFormat(locale, options).format(new Date(value));
+}
+
+function formatHistoryTooltip(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? formatDate(value, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    : new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
 }
 
 // Format the time when the reference feed was last checked, or return a default message if unavailable.
@@ -298,27 +336,28 @@ function formatPairRate(rate) {
 }
 
 // Render the historical chart for a currency pair, including the line graph, area fill, grid lines, and data points. If no observations are available, display an appropriate message or loading state.
-function historyChartMarkup(id, observations, cardIndex) {
-  const { base, quote } = pairParts(id);
+function historyChartMarkup(id, observations, cardIndex, options = {}) {
+  const marketChart = options.kind === "market";
+  const { base, quote } = marketChart ? { base: id, quote: "USD" } : pairParts(id);
+  const asset = MARKET_HISTORY_ASSETS.find(({ code }) => code === id);
   const points = (Array.isArray(observations) ? observations : [])
-    .filter(
-      (item) =>
-        item &&
-        /^\d{4}-\d{2}-\d{2}$/.test(item.date) &&
-        Number.isFinite(Number(item.rate)) &&
-        Number(item.rate) > 0,
-    )
+    .filter((item) => {
+      const date = item?.observedAt ?? item?.timestamp ?? item?.date;
+      return item && date && !Number.isNaN(new Date(date).getTime()) && Number.isFinite(Number(item.rate ?? item.value)) && Number(item.rate ?? item.value) > 0;
+    })
     .map((item) => ({
-      date: item.date,
-      rate: String(item.rate),
-      value: Number(item.rate),
+      date: item.observedAt ?? item.timestamp ?? item.date,
+      rate: String(item.rate ?? item.value),
+      value: Number(item.rate ?? item.value),
     }));
-  const currencyLabel = `${currencyName(base)} / ${currencyName(quote)}`;
+  const currencyLabel = marketChart ? `${id} · ${asset?.detail ?? "USD"}` : `${currencyName(base)} / ${currencyName(quote)}`;
   if (!points.length) {
-    if (historyLoading) {
+    if (marketChart ? marketHistoryLoading : historyLoading) {
       return `<article class="history-card history-card-loading" role="listitem" aria-hidden="true"><div class="history-loading-line"></div><div class="history-loading-rate"></div><div class="history-loading-chart"></div></article>`;
     }
-    return `<article class="history-card history-card-empty" role="listitem"><div class="history-card-title"><div><h3>${escapeHtml(base)} <span aria-hidden="true">→</span> ${escapeHtml(quote)}</h3><p>${escapeHtml(currencyLabel)}</p></div></div><div class="history-empty-state"><span class="history-empty-icon" aria-hidden="true">⌁</span><strong>No history in this range</strong><span>The source may not publish on these dates or cover this currency.</span></div></article>`;
+    const reason = options.unavailableReason || historyUnavailableReason || "The source may not publish on these dates or cover this currency.";
+    const title = marketChart ? (asset?.name ?? id) : `${base} → ${quote}`;
+    return `<article class="history-card history-card-empty" role="listitem"><div class="history-card-title"><div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(currencyLabel)}</p></div></div><div class="history-empty-state"><span class="history-empty-icon" aria-hidden="true">⌁</span><strong>${marketChart ? "Price history unavailable" : "No history in this range"}</strong><span>${escapeHtml(reason)}</span></div></article>`;
   }
   // Calculate the dimensions and coordinates for the chart, including the min/max values, padding, and scaling for the SVG elements.
   const width = 680;
@@ -360,23 +399,26 @@ function historyChartMarkup(id, observations, cardIndex) {
   const dots = coords
     .map(
       (point, index) =>
-        `<circle class="history-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="2.35"><title>${escapeHtml(formatDate(points[index].date))}: ${escapeHtml(formatPairRate(points[index].rate))} ${escapeHtml(quote)}</title></circle>`,
+        `<circle class="history-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="2.35"><title>${escapeHtml(formatHistoryTooltip(points[index].date))}: ${escapeHtml(formatPairRate(points[index].rate))} ${escapeHtml(quote)}</title></circle>`,
     )
     .join("");
-  const firstDate = formatDate(points[0].date, {
-    month: "short",
-    day: "numeric",
-  });
-  const lastDate = formatDate(points.at(-1).date, {
-    month: "short",
-    day: "numeric",
-  });
+  const range = marketChart ? marketHistoryRange : historyRange;
+  const firstDate = formatHistoryAxis(points[0].date, range);
+  const lastDate = formatHistoryAxis(points.at(-1).date, range);
   const latest = points.at(-1);
-  const ariaLabel = `${base} to ${quote} daily reference rate from ${formatDate(points[0].date)} to ${formatDate(latest.date)}`;
+  const ariaLabel = marketChart
+    ? `${asset?.name ?? id} USD reference price from ${formatHistoryTooltip(points[0].date)} to ${formatHistoryTooltip(latest.date)}`
+    : `${base} to ${quote} reference rate from ${formatHistoryTooltip(points[0].date)} to ${formatHistoryTooltip(latest.date)}`;
+  const title = marketChart ? (asset?.name ?? id) : `${base} <span aria-hidden="true">→</span> ${quote}`;
+  const latestValue = marketChart
+    ? new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(latest.rate))
+    : formatPairRate(latest.rate);
+  const latestPrefix = marketChart ? "USD price" : `1 ${escapeHtml(base)} <span aria-hidden="true">=</span>`;
+  const latestMeta = marketChart ? `${escapeHtml(id)} · ${escapeHtml(formatHistoryTooltip(latest.date))}` : `${escapeHtml(quote)} · ${escapeHtml(formatHistoryTooltip(latest.date))}`;
   // Return the complete HTML markup for the history card, including the title, latest rate, chart, and footer with low/high values.
   return `<article class="history-card" role="listitem"> 
-    <div class="history-card-title"><div><h3>${escapeHtml(base)} <span aria-hidden="true">→</span> ${escapeHtml(quote)}</h3><p>${escapeHtml(currencyLabel)}</p></div><span class="history-observation-count">${points.length} ${points.length === 1 ? "point" : "points"}</span></div>
-    <div class="history-latest"><span>1 ${escapeHtml(base)} <span aria-hidden="true">=</span></span><strong>${escapeHtml(formatPairRate(latest.rate))}</strong><small>${escapeHtml(quote)} · ${escapeHtml(formatDate(latest.date))}</small></div>
+    <div class="history-card-title"><div><h3>${title}</h3><p>${escapeHtml(currencyLabel)}</p></div><span class="history-observation-count">${points.length} ${points.length === 1 ? "point" : "points"}</span></div>
+    <div class="history-latest"><span>${latestPrefix}</span><strong>${escapeHtml(latestValue)}</strong><small>${latestMeta}</small></div>
     <svg class="history-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(ariaLabel)}">
       <defs><linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="var(--chart-line)" stop-opacity=".2"/><stop offset="100%" stop-color="var(--chart-line)" stop-opacity="0"/></linearGradient></defs>
       ${grid}<path class="history-area" d="${area}" fill="url(#${gradientId})"/><path class="history-line" d="${line}"/>${dots}
@@ -397,6 +439,54 @@ function renderPairHistory() {
     : '<div class="history-board-empty" role="listitem"><strong>No currency pairs yet</strong><span>Add a pair to see its rate history here.</span></div>';
 }
 
+function renderMarketHistory() {
+  if (!elements.marketHistoryGrid) return;
+  elements.marketHistoryGrid.setAttribute("aria-busy", String(marketHistoryLoading));
+  const metalCards = MARKET_HISTORY_ASSETS.map((asset, index) =>
+    historyChartMarkup(asset.code, marketHistory[asset.code], index, {
+      kind: "market",
+      unavailableReason: marketHistoryUnavailableReason,
+    }),
+  );
+  const diamondCard = `<article class="history-card history-card-empty market-diamond-history" role="listitem"><div class="history-card-title"><div><h3>Diamond</h3><p>Grade-specific benchmark</p></div></div><div class="history-empty-state"><span class="history-empty-icon" aria-hidden="true">◇</span><strong>Choose a diamond specification</strong><span>There is no universal diamond price series. A licensed benchmark needs the stone’s grade and type.</span></div></article>`;
+  elements.marketHistoryGrid.innerHTML = [...metalCards, diamondCard].join("");
+}
+
+async function loadMarketHistory() {
+  const requestId = ++marketHistoryRequestId;
+  marketHistory = {};
+  marketHistoryLoading = true;
+  renderMarketHistory();
+  elements.marketHistoryStatus.textContent = "Loading metal price history…";
+  const assets = MARKET_HISTORY_ASSETS.map(({ code }) => code).join("|");
+  try {
+    const response = await fetch(
+      `/api/market-history?assets=${encodeURIComponent(assets)}&range=${encodeURIComponent(marketHistoryRange)}`,
+      { headers: { accept: "application/json" } },
+    );
+    if (!response.ok) throw new Error("Metal history unavailable");
+    const body = await response.json();
+    if (requestId !== marketHistoryRequestId) return;
+    marketHistoryLoading = false;
+    marketHistory = body.rates && typeof body.rates === "object" ? body.rates : {};
+    marketHistoryUnavailableReason = Array.isArray(body.errors) && body.errors.length
+      ? body.errors[0].message
+      : "No observations were returned for this range.";
+    const coverage = MARKET_HISTORY_ASSETS.filter(({ code }) => Array.isArray(marketHistory[code]) && marketHistory[code].length).length;
+    elements.marketHistoryStatus.textContent = coverage
+      ? `Metal reference history · ${coverage} of ${MARKET_HISTORY_ASSETS.length} series have observations · ${marketHistoryRange.toUpperCase()} view`
+      : `${body.source ?? "Metals history"} · ${marketHistoryUnavailableReason}`;
+    renderMarketHistory();
+  } catch {
+    if (requestId !== marketHistoryRequestId) return;
+    marketHistoryLoading = false;
+    marketHistory = {};
+    marketHistoryUnavailableReason = "Metal history could not be loaded. Try selecting the range again.";
+    elements.marketHistoryStatus.textContent = marketHistoryUnavailableReason;
+    renderMarketHistory();
+  }
+}
+
 // Load the historical reference rates for the current pairs and range, updating the UI with loading states, errors, and the resulting data.
 async function loadPairHistory() {
   const requestId = ++historyRequestId;
@@ -409,9 +499,12 @@ async function loadPairHistory() {
     return;
   } // If there are no pairs on the board, clear the history and show a message indicating that pairs need to be added.
   pairHistory = {};
+  historyUnavailableReason = "";
   historyLoading = true;
   renderPairHistory();
-  elements.historyStatus.textContent = "Loading daily reference history…";
+  elements.historyStatus.textContent = historyRange === "5min" || historyRange === "24h"
+    ? "Checking intraday reference history…"
+    : "Loading daily reference history…";
   const pairs = [...settings.pairs];
   const query = encodeURIComponent(
     pairs.map((id) => id.replace("/", ":")).join("|"),
@@ -431,10 +524,10 @@ async function loadPairHistory() {
       (id) => Array.isArray(pairHistory[id]) && pairHistory[id].length,
     ).length;
     const hasErrors = Array.isArray(body.errors) && body.errors.length > 0;
-    elements.historyStatus.textContent =
-      hasErrors || coveredPairs < pairs.length
-        ? `Daily history · ${coveredPairs} of ${pairs.length} pairs have observations in this range. Gaps or unsupported currencies may leave some charts empty.`
-        : `Daily reference history · ${pairs.length} ${pairs.length === 1 ? "pair" : "pairs"} · ${historyRange.toUpperCase()} view`;
+    historyUnavailableReason = hasErrors ? body.errors[0]?.message ?? "The selected data source has no observations at this resolution." : "The source has no observations for this pair in the selected range.";
+    elements.historyStatus.textContent = hasErrors || coveredPairs < pairs.length
+      ? `${historyRange === "5min" || historyRange === "24h" ? "Intraday" : "Daily"} history · ${coveredPairs} of ${pairs.length} pairs have observations. ${historyUnavailableReason}`
+      : `${historyRange === "5min" || historyRange === "24h" ? "Intraday" : "Daily reference"} history · ${pairs.length} ${pairs.length === 1 ? "pair" : "pairs"} · ${historyRange.toUpperCase()} view`;
     renderPairHistory();
   } catch {
     if (requestId !== historyRequestId) return;
@@ -1196,6 +1289,10 @@ function applyViewPreferences({ persist = true } = {}) {
   elements.pairSort.value = view.sort; // Set the sort dropdown in the UI to reflect the current view sort option (e.g., code, name, rate-high, rate-low, board), allowing users to see which sorting method is active.
   elements.boardDensity.value = view.density; // Set the density dropdown in the UI to reflect the current view density (comfortable or compact), allowing users to see which density setting is active.
   elements.boardTheme.value = view.theme; // Set the theme dropdown in the UI to reflect the current view theme (light or dark), allowing users to see which theme setting is active.
+  const themeAction = view.theme === "night" ? "Switch to bright mode" : "Switch to night mode";
+  elements.themeToggle.setAttribute("title", themeAction);
+  elements.themeToggle.setAttribute("aria-pressed", String(view.theme === "night"));
+  elements.themeToggleLabel.textContent = view.theme === "night" ? "Day mode" : "Night mode";
   if (persist) writeJson(VIEW_STORAGE_KEY, view); // Persist the current view preferences to localStorage, allowing the application to remember the user's settings across sessions.
 }
 
@@ -1424,6 +1521,7 @@ function initializeEvents() {
   elements.refreshButton.addEventListener("click", () => {
     loadRates({ announceSuccess: true }); // Refresh the reference rates when the refresh button is clicked, providing user feedback upon successful completion.
     loadPairHistory(); // Refresh the pair history for the currently selected pair when the refresh button is clicked, ensuring that the displayed historical data is up to date.
+    loadMarketHistory();
     refreshCalculatorReference(currentCalculatorPair(), { force: true });
   }); // Refresh the reference rates, pair history, and calculator reference for the currently selected pair when the refresh button is clicked.
   elements.historyRanges.addEventListener("click", (event) => {
@@ -1445,6 +1543,15 @@ function initializeEvents() {
       }); // Update the active state of history range buttons and load the corresponding pair history when a new range is selected.
     loadPairHistory();
   }); // Handle clicks on history range buttons to update the selected range and load the corresponding pair history data.
+  elements.marketHistoryRanges.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-market-history-range]");
+    if (!button || marketHistoryRange === button.dataset.marketHistoryRange) return;
+    marketHistoryRange = button.dataset.marketHistoryRange;
+    elements.marketHistoryRanges.querySelectorAll("[data-market-history-range]").forEach((rangeButton) => {
+      rangeButton.setAttribute("aria-pressed", String(rangeButton === button));
+    });
+    loadMarketHistory();
+  });
   elements.searchInput.addEventListener("input", () => {
     searchTerm = elements.searchInput.value;
     renderTable();
@@ -1472,6 +1579,11 @@ function initializeEvents() {
   elements.boardTheme.addEventListener("change", () => {
     view.theme = elements.boardTheme.value;
     applyViewPreferences();
+  });
+  elements.themeToggle.addEventListener("click", () => {
+    view.theme = view.theme === "night" ? "evergreen" : "night";
+    applyViewPreferences();
+    announce(view.theme === "night" ? "Night mode on." : "Bright mode on.");
   });
   elements.resetDisplayOptions.addEventListener("click", () => {
     Object.assign(view, DEFAULT_VIEW); // Reset the view preferences to their default values, including theme, density, filter, and sort options.
@@ -1674,6 +1786,8 @@ if (browserCache) {
 loadCurrencies(); // Fetch the latest list of available currencies and metals from the network, updating the internal state and UI accordingly.
 loadRates(); // Fetch the latest reference rates for the selected currency pairs from the network, updating the internal state and UI accordingly.
 loadPairHistory(); // Fetch the historical data for the selected currency pairs from the network, updating the internal state and UI accordingly.
+renderMarketHistory();
+loadMarketHistory();
 window.setInterval(
   () => {
     if (document.visibilityState === "visible") loadRates();
