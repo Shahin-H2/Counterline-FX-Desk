@@ -59,6 +59,11 @@
           <div class="topbar-right">
             <span class="local-label"><span class="pulse-dot" aria-hidden="true"></span> LOCAL MODE</span>
             <span class="topbar-date" id="today-label"></span>
+            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Night mode" aria-pressed="false" title="Switch to night mode">
+              <svg class="theme-icon theme-icon-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16.4 12.7A7.1 7.1 0 0 1 7.3 3.6a7.4 7.4 0 1 0 9.1 9.1Z"/></svg>
+              <svg class="theme-icon theme-icon-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.3"/><path d="M10 1.8v2.1m0 12.2v2.1M1.8 10h2.1m12.2 0h2.1M4.2 4.2l1.5 1.5m8.6 8.6 1.5 1.5m0-11.6-1.5 1.5m-8.6 8.6-1.5 1.5"/></svg>
+              <span id="theme-toggle-label">Night mode</span>
+            </button>
           </div>
         </header>
 
@@ -230,18 +235,18 @@
             <div class="history-heading">
               <div class="card-kicker">RATE MOVEMENT</div>
               <h2 id="history-title">Currency pair history</h2>
-              <p>Explore daily reference rates for every pair on your board.</p>
+              <p>Explore reference rates for every pair on your board.</p>
             </div>
             <div class="history-controls" role="group" aria-label="Chart time range" aria-describedby="history-resolution-note">
-              <button class="history-range" type="button" disabled title="A 5-minute chart needs an intraday data source" aria-label="5 minutes, unavailable with daily reference data">5 min</button>
-              <button class="history-range" type="button" data-history-range="1d" aria-pressed="false">1 day</button>
+              <button class="history-range" type="button" data-history-range="5min" aria-pressed="false">5 min</button>
+              <button class="history-range" type="button" data-history-range="24h" aria-pressed="false">24 hours</button>
               <button class="history-range" type="button" data-history-range="1w" aria-pressed="false">1 week</button>
               <button class="history-range" type="button" data-history-range="1m" aria-pressed="true">1 month</button>
               <button class="history-range" type="button" data-history-range="3m" aria-pressed="false">3 months</button>
               <button class="history-range" type="button" data-history-range="6m" aria-pressed="false">6 months</button>
             </div>
           </header>
-          <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span> The current source updates daily. Five-minute history needs a separate intraday feed; gaps can appear on weekends and holidays.</p>
+          <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span> The current source publishes daily observations. 24-hour and 5-minute charts need an intraday feed; the graph will only plot observations supplied by its source.</p>
           <div class="history-status" id="history-status" role="status" aria-live="polite">Loading daily history…</div>
           <div class="history-grid" id="history-grid" role="list" aria-label="Currency pair history charts"></div>
         </section>
@@ -255,7 +260,7 @@
             </div>
             <div class="markets-update" id="markets-status" role="status" aria-live="polite">
               <span class="market-live-dot" aria-hidden="true"></span>
-              <span>Quote feeds need to be selected</span>
+              <span>Live data source not selected</span>
             </div>
           </header>
 
@@ -263,37 +268,37 @@
             <article class="market-card market-card-gold" role="listitem">
               <div class="market-card-top"><span class="market-symbol">Au</span><span class="market-kind">PRECIOUS METAL</span></div>
               <div class="market-card-name"><h3>Gold</h3><span>XAU</span></div>
-              <div class="market-value">—</div>
+              <div class="market-value market-value-unavailable">Source needed</div>
               <div class="market-unit">USD <span>·</span> per troy ounce</div>
-              <div class="market-card-bottom"><span class="market-change market-change-pending">Waiting for source</span><span class="market-observation">No quote yet</span></div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Feed required</span><span class="market-observation">No source selected</span></div>
             </article>
             <article class="market-card market-card-silver" role="listitem">
               <div class="market-card-top"><span class="market-symbol">Ag</span><span class="market-kind">PRECIOUS METAL</span></div>
               <div class="market-card-name"><h3>Silver</h3><span>XAG</span></div>
-              <div class="market-value">—</div>
+              <div class="market-value market-value-unavailable">Source needed</div>
               <div class="market-unit">USD <span>·</span> per troy ounce</div>
-              <div class="market-card-bottom"><span class="market-change market-change-pending">Waiting for source</span><span class="market-observation">No quote yet</span></div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Feed required</span><span class="market-observation">No source selected</span></div>
             </article>
             <article class="market-card market-card-platinum" role="listitem">
               <div class="market-card-top"><span class="market-symbol">Pt</span><span class="market-kind">PRECIOUS METAL</span></div>
               <div class="market-card-name"><h3>Platinum</h3><span>XPT</span></div>
-              <div class="market-value">—</div>
+              <div class="market-value market-value-unavailable">Source needed</div>
               <div class="market-unit">USD <span>·</span> per troy ounce</div>
-              <div class="market-card-bottom"><span class="market-change market-change-pending">Waiting for source</span><span class="market-observation">No quote yet</span></div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Feed required</span><span class="market-observation">No source selected</span></div>
             </article>
             <article class="market-card market-card-oil" role="listitem">
               <div class="market-card-top"><span class="market-symbol">WTI</span><span class="market-kind">ENERGY</span></div>
               <div class="market-card-name"><h3>Crude oil</h3><span>WTI spot</span></div>
-              <div class="market-value">—</div>
+              <div class="market-value market-value-unavailable">Source needed</div>
               <div class="market-unit">USD <span>·</span> per barrel</div>
-              <div class="market-card-bottom"><span class="market-change market-change-pending">Daily benchmark</span><span class="market-observation">No quote yet</span></div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Feed required</span><span class="market-observation">No source selected</span></div>
             </article>
             <article class="market-card market-card-brent" role="listitem">
               <div class="market-card-top"><span class="market-symbol">BRENT</span><span class="market-kind">ENERGY</span></div>
               <div class="market-card-name"><h3>Brent crude</h3><span>North Sea</span></div>
-              <div class="market-value">—</div>
+              <div class="market-value market-value-unavailable">Source needed</div>
               <div class="market-unit">USD <span>·</span> per barrel</div>
-              <div class="market-card-bottom"><span class="market-change market-change-pending">Daily benchmark</span><span class="market-observation">No quote yet</span></div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Feed required</span><span class="market-observation">No source selected</span></div>
             </article>
             <article class="market-card market-card-diamond" role="listitem">
               <div class="market-card-top"><span class="market-symbol">◇</span><span class="market-kind">GEMSTONE</span></div>
@@ -308,6 +313,27 @@
             <span class="markets-footnote-mark" aria-hidden="true">i</span>
             <p>These are reference-market ideas, not counter offers. Metals and oil need separate data providers. Diamond prices depend on a specification and a licensed benchmark.</p>
           </footer>
+        </section>
+
+        <section class="history-section market-history-section" id="market-history" aria-labelledby="market-history-title">
+          <header class="history-header">
+            <div class="history-heading">
+              <div class="card-kicker">PRECIOUS METAL MOVEMENT</div>
+              <h2 id="market-history-title">Metal price history</h2>
+              <p>Gold, silver and platinum per troy ounce. Diamond prices need a selected grade and benchmark.</p>
+            </div>
+            <div class="history-controls market-history-controls" role="group" aria-label="Metal chart time range" aria-describedby="market-history-resolution-note">
+              <button class="history-range" type="button" data-market-history-range="5min" aria-pressed="false">5 min</button>
+              <button class="history-range" type="button" data-market-history-range="24h" aria-pressed="false">24 hours</button>
+              <button class="history-range" type="button" data-market-history-range="1w" aria-pressed="false">1 week</button>
+              <button class="history-range" type="button" data-market-history-range="1m" aria-pressed="true">1 month</button>
+              <button class="history-range" type="button" data-market-history-range="3m" aria-pressed="false">3 months</button>
+              <button class="history-range" type="button" data-market-history-range="6m" aria-pressed="false">6 months</button>
+            </div>
+          </header>
+          <p class="history-resolution-note" id="market-history-resolution-note"><span aria-hidden="true">ⓘ</span> Metal history appears here when a metals data provider is configured. Diamond charts require a licensed grade-specific benchmark.</p>
+          <div class="history-status" id="market-history-status" role="status" aria-live="polite">No metals history source selected.</div>
+          <div class="history-grid market-history-grid" id="market-history-grid" role="list" aria-label="Precious metal and diamond history charts"></div>
         </section>
 
         <footer class="page-footer"><span>COUNTERLINE <span class="footer-divider">/</span> FX DESK</span><span>Reference data for operational context only.</span></footer>
