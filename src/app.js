@@ -93,6 +93,7 @@ const elements = {
   marketHistoryGrid: document.querySelector("#market-history-grid"),
   marketHistoryStatus: document.querySelector("#market-history-status"),
   marketHistoryRanges: document.querySelector(".market-history-controls"),
+  marketStatus: document.querySelector("#markets-status"),
   announcements: document.querySelector("#announcements"), // the live region for announcing changes to screen readers
 };
 
@@ -192,8 +193,8 @@ let marketHistoryUnavailableReason = "No metals history source is configured.";
 const MARKET_HISTORY_ASSETS = [
   { code: "XAU", name: "Gold", detail: "USD per troy ounce" },
   { code: "XAG", name: "Silver", detail: "USD per troy ounce" },
-  { code: "XPT", name: "Platinum", detail: "USD per troy ounce" },
 ];
+const MARKET_CODES = ["XAU", "XAG"];
 
 // Helper functions
 function pairParts(id) {
@@ -448,8 +449,7 @@ function renderMarketHistory() {
       unavailableReason: marketHistoryUnavailableReason,
     }),
   );
-  const diamondCard = `<article class="history-card history-card-empty market-diamond-history" role="listitem"><div class="history-card-title"><div><h3>Diamond</h3><p>Grade-specific benchmark</p></div></div><div class="history-empty-state"><span class="history-empty-icon" aria-hidden="true">◇</span><strong>Choose a diamond specification</strong><span>There is no universal diamond price series. A licensed benchmark needs the stone’s grade and type.</span></div></article>`;
-  elements.marketHistoryGrid.innerHTML = [...metalCards, diamondCard].join("");
+  elements.marketHistoryGrid.innerHTML = metalCards.join("");
 }
 
 async function loadMarketHistory() {
@@ -484,6 +484,53 @@ async function loadMarketHistory() {
     marketHistoryUnavailableReason = "Metal history could not be loaded. Try selecting the range again.";
     elements.marketHistoryStatus.textContent = marketHistoryUnavailableReason;
     renderMarketHistory();
+  }
+}
+
+function formatUsdMetalPrice(value) {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value));
+}
+
+async function loadMarketQuotes() {
+  try {
+    const response = await fetch("/api/markets", { headers: { accept: "application/json" } });
+    if (!response.ok) throw new Error("Market prices unavailable");
+    const body = await response.json();
+    const cards = new Map([...document.querySelectorAll("[data-market-code]")].map((card) => [card.dataset.marketCode, card]));
+    const available = [];
+    for (const code of MARKET_CODES) {
+      const card = cards.get(code);
+      if (!card) continue;
+      const rate = body.rates?.[code];
+      const value = card.querySelector("[data-market-value]");
+      const change = card.querySelector(".market-change");
+      const observation = card.querySelector(".market-observation");
+      if (rate && Number.isFinite(Number(rate.rate))) {
+        value.textContent = formatUsdMetalPrice(rate.rate);
+        value.classList.remove("market-value-unavailable");
+        change.textContent = "Spot reference";
+        observation.textContent = rate.observedAt ? formatHistoryTooltip(rate.observedAt) : "Observation time unavailable";
+        available.push(code);
+      } else {
+        value.textContent = "Source needed";
+        value.classList.add("market-value-unavailable");
+        change.textContent = "Feed required";
+        observation.textContent = "No source selected";
+      }
+    }
+    const needsKey = body.errors?.some((error) => error.code === "provider-not-configured");
+    elements.marketStatus.textContent = available.length
+      ? `Twelve Data · ${available.length} of ${MARKET_CODES.length} spot prices available`
+      : needsKey
+        ? "Twelve Data key and display rights required"
+        : "Twelve Data has no recent metal observations";
+  } catch {
+    elements.marketStatus.textContent = "Twelve Data metal prices could not be loaded";
   }
 }
 
@@ -1522,6 +1569,7 @@ function initializeEvents() {
     loadRates({ announceSuccess: true }); // Refresh the reference rates when the refresh button is clicked, providing user feedback upon successful completion.
     loadPairHistory(); // Refresh the pair history for the currently selected pair when the refresh button is clicked, ensuring that the displayed historical data is up to date.
     loadMarketHistory();
+    loadMarketQuotes();
     refreshCalculatorReference(currentCalculatorPair(), { force: true });
   }); // Refresh the reference rates, pair history, and calculator reference for the currently selected pair when the refresh button is clicked.
   elements.historyRanges.addEventListener("click", (event) => {
@@ -1788,9 +1836,13 @@ loadRates(); // Fetch the latest reference rates for the selected currency pairs
 loadPairHistory(); // Fetch the historical data for the selected currency pairs from the network, updating the internal state and UI accordingly.
 renderMarketHistory();
 loadMarketHistory();
+loadMarketQuotes();
 window.setInterval(
   () => {
-    if (document.visibilityState === "visible") loadRates();
+    if (document.visibilityState === "visible") {
+      loadRates();
+      loadMarketQuotes();
+    }
   },
   30 * 60 * 1000,
 ); // Set up a periodic refresh of reference rates every 30 minutes, but only when the document is visible to the user, to avoid unnecessary network requests when the application is not in use.
