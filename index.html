@@ -235,7 +235,7 @@
             <div class="history-heading">
               <div class="card-kicker">RATE MOVEMENT</div>
               <h2 id="history-title">Currency pair history</h2>
-              <p>Explore reference rates for every pair on your board.</p>
+              <p>Drag cards to reorder them. Estimates are labeled when provider history is unavailable.</p>
             </div>
             <div class="history-controls" role="group" aria-label="Chart time range" aria-describedby="history-resolution-note">
               <button class="history-range" type="button" data-history-range="5min" aria-pressed="false">5 min</button>
@@ -246,7 +246,7 @@
               <button class="history-range" type="button" data-history-range="6m" aria-pressed="false">6 months</button>
             </div>
           </header>
-          <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span> Daily currency history uses Frankfurter. 24-hour and 5-minute FX history uses <a href="https://twelvedata.com/" target="_blank" rel="noreferrer">Twelve Data</a> when a licensed API key is configured. Charts only plot observations returned by the source.</p>
+          <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span> Daily currency history uses Frankfurter. 24-hour and 5-minute FX history uses <a href="https://twelvedata.com/" target="_blank" rel="noreferrer">Twelve Data</a> when configured. If data is unavailable, the chart labels an interpolation from the latest saved reference rate; it is not observed market history.</p>
           <div class="history-status" id="history-status" role="status" aria-live="polite">Loading daily history…</div>
           <div class="history-grid" id="history-grid" role="list" aria-label="Currency pair history charts"></div>
         </section>
@@ -306,7 +306,7 @@
             <div class="history-heading">
               <div class="card-kicker">PRECIOUS METAL MOVEMENT</div>
               <h2 id="market-history-title">Gold &amp; silver price history</h2>
-              <p>Reference prices in USD per troy ounce.</p>
+              <p>Drag cards to reorder them. Reference prices in USD per troy ounce.</p>
             </div>
             <div class="history-controls market-history-controls" role="group" aria-label="Metal chart time range" aria-describedby="market-history-resolution-note">
               <button class="history-range" type="button" data-market-history-range="5min" aria-pressed="false">5 min</button>
@@ -317,7 +317,7 @@
               <button class="history-range" type="button" data-market-history-range="6m" aria-pressed="false">6 months</button>
             </div>
           </header>
-          <p class="history-resolution-note" id="market-history-resolution-note"><span aria-hidden="true">ⓘ</span> Twelve Data supplies gold and silver history, including minute and hourly observations, when a licensed API key is configured.</p>
+          <p class="history-resolution-note" id="market-history-resolution-note"><span aria-hidden="true">ⓘ</span> Twelve Data supplies gold and silver history when configured. If data is unavailable, a chart labels any interpolation from the latest saved metal quote; it is not observed market history.</p>
           <div class="history-status" id="market-history-status" role="status" aria-live="polite">No metals history source selected.</div>
           <div class="history-grid market-history-grid" id="market-history-grid" role="list" aria-label="Gold and silver history charts"></div>
         </section>
