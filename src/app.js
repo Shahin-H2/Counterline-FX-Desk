@@ -532,6 +532,15 @@ async function loadMarketQuotes() {
         ? "Twelve Data access not configured"
         : "Twelve Data has no recent metal observations";
   } catch {
+    for (const card of document.querySelectorAll("[data-market-code]")) {
+      const value = card.querySelector("[data-market-value]");
+      const change = card.querySelector(".market-change");
+      const observation = card.querySelector(".market-observation");
+      value.textContent = "Unavailable";
+      value.classList.add("market-value-unavailable");
+      change.textContent = "Feed unavailable";
+      observation.textContent = "Will retry automatically";
+    }
     elements.marketStatus.textContent = "Twelve Data metal prices could not be loaded";
   }
 }
