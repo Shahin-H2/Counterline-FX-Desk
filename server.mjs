@@ -19,7 +19,10 @@ const MIME_TYPES = {
 
 let currencyCache;
 const historyCache = new Map();
-const HISTORY_RANGES = { "1d": { days: 1 }, "1w": { days: 7 }, "1m": { months: 1 }, "3m": { months: 3 }, "6m": { months: 6 } };
+const HISTORY_RANGES = { "1w": { days: 7 }, "1m": { months: 1 }, "3m": { months: 3 }, "6m": { months: 6 } };
+const INTRADAY_HISTORY_RANGES = new Set(["5min", "24h"]);
+const MARKET_HISTORY_RANGES = new Set(["5min", "24h", "1w", "1m", "3m", "6m"]);
+const MARKET_HISTORY_ASSETS = new Set(["XAU", "XAG", "XPT"]);
 
 function historyDates(range, instant = new Date()) {
   const to = new Date(Date.UTC(instant.getUTCFullYear(), instant.getUTCMonth(), instant.getUTCDate()));
@@ -101,8 +104,19 @@ const server = createServer(async (request, response) => {
   if (url.pathname === "/api/history") {
     const pairs = parsePairs(url.searchParams.get("pairs"));
     const range = url.searchParams.get("range");
-    if (!pairs || !Object.hasOwn(HISTORY_RANGES, range)) {
-      sendJson(response, 400, { error: "Provide up to 30 currency pairs and a supported daily range." });
+    if (!pairs || (!Object.hasOwn(HISTORY_RANGES, range) && !INTRADAY_HISTORY_RANGES.has(range))) {
+      sendJson(response, 400, { error: "Provide up to 30 currency pairs and a supported range." });
+      return;
+    }
+    if (INTRADAY_HISTORY_RANGES.has(range)) {
+      const rates = Object.fromEntries(pairs.map(({ base, quote }) => [`${base}/${quote}`, []]));
+      sendJson(response, 200, {
+        source: "Frankfurter daily reference",
+        interval: range === "5min" ? "five-minute" : "hourly",
+        rates,
+        errors: [{ code: "intraday-source-required", message: "Frankfurter publishes daily observations only. Choose and configure an intraday FX provider to plot 24 hourly or 5-minute observations." }],
+        cacheStatus: "not-configured",
+      });
       return;
     }
     const { from, to } = historyDates(range);
@@ -128,6 +142,27 @@ const server = createServer(async (request, response) => {
     } catch {
       sendJson(response, 503, { error: "Historical reference data is unavailable. Try again shortly." });
     }
+    return;
+  }
+
+  if (url.pathname === "/api/market-history") {
+    const requestedAssets = url.searchParams.get("assets")?.split("|") ?? [];
+    const range = url.searchParams.get("range");
+    if (
+      !requestedAssets.length ||
+      requestedAssets.length > 6 ||
+      requestedAssets.some((asset) => !MARKET_HISTORY_ASSETS.has(asset)) ||
+      !MARKET_HISTORY_RANGES.has(range)
+    ) {
+      sendJson(response, 400, { error: "Provide supported market assets and a supported history range." });
+      return;
+    }
+    sendJson(response, 200, {
+      source: "Metals history provider not configured",
+      rates: Object.fromEntries(requestedAssets.map((asset) => [asset, []])),
+      errors: [{ code: "metals-source-required", message: "No metals price source is configured. The chart will not invent prices or history." }],
+      cacheStatus: "not-configured",
+    });
     return;
   }
 
