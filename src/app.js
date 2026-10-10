@@ -517,17 +517,19 @@ async function loadMarketQuotes() {
         observation.textContent = rate.observedAt ? formatHistoryTooltip(rate.observedAt) : "Observation time unavailable";
         available.push(code);
       } else {
-        value.textContent = "Source needed";
+        value.textContent = "Access needed";
         value.classList.add("market-value-unavailable");
         change.textContent = "Feed required";
-        observation.textContent = "No source selected";
+        observation.textContent = body.errors?.some((error) => error.code === "provider-not-configured")
+          ? "Key and rights needed"
+          : "No recent observation";
       }
     }
     const needsKey = body.errors?.some((error) => error.code === "provider-not-configured");
     elements.marketStatus.textContent = available.length
       ? `Twelve Data · ${available.length} of ${MARKET_CODES.length} spot prices available`
       : needsKey
-        ? "Twelve Data key and display rights required"
+        ? "Twelve Data access not configured"
         : "Twelve Data has no recent metal observations";
   } catch {
     elements.marketStatus.textContent = "Twelve Data metal prices could not be loaded";
@@ -947,12 +949,19 @@ async function loadRates({ announceSuccess = false } = {}) {
     if (!body.rates || typeof body.rates !== "object")
       throw new Error("Unexpected reference data");
     const returnedRates = body.rates;
+    const errors = Array.isArray(body.errors) ? [...body.errors] : [];
+    const metalSourceUnavailable = errors.some((error) => error.code === "provider-not-configured");
     const nextRates = { ...referenceRates };
     for (const [id, rate] of Object.entries(returnedRates))
       nextRates[id] = { ...rate, cacheFallback: Boolean(rate.cacheFallback) };
     const fallbackPairs = [];
     for (const id of settings.pairs) {
       if (!returnedRates[id] && nextRates[id]) {
+        const { base, quote } = pairParts(id);
+        if (metalSourceUnavailable && isMetalPair(base, quote)) {
+          delete nextRates[id];
+          continue;
+        }
         nextRates[id] = { ...nextRates[id], cacheFallback: true };
         fallbackPairs.push(id);
       }
@@ -963,7 +972,6 @@ async function loadRates({ announceSuccess = false } = {}) {
       fallbackPairs.length && bodyCacheStatus !== "stale-cache"
         ? "partial-cache"
         : bodyCacheStatus;
-    const errors = Array.isArray(body.errors) ? [...body.errors] : [];
     if (fallbackPairs.length && !errors.length)
       errors.push({
         message:
@@ -975,7 +983,7 @@ async function loadRates({ announceSuccess = false } = {}) {
       retrievedAt: body.retrievedAt ?? null,
       checkedAt: body.checkedAt ?? body.retrievedAt ?? null,
     };
-    if (Object.keys(returnedRates).length) {
+    if (Object.keys(returnedRates).length || metalSourceUnavailable) {
       writeJson(REFERENCE_CACHE_KEY, {
         rates: referenceRates,
         retrievedAt: referenceMeta.retrievedAt,
@@ -1846,3 +1854,9 @@ window.setInterval(
   },
   30 * 60 * 1000,
 ); // Set up a periodic refresh of reference rates every 30 minutes, but only when the document is visible to the user, to avoid unnecessary network requests when the application is not in use.
+window.setInterval(
+  () => {
+    if (document.visibilityState === "visible") loadMarketQuotes();
+  },
+  5 * 60 * 1000,
+);
