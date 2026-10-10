@@ -581,10 +581,18 @@ function renderMarketHistory() {
 
 async function loadMarketHistory() {
   const requestId = ++marketHistoryRequestId;
-  marketHistory = {};
+  const immediate = fillMissingWithInterpolation(
+    MARKET_HISTORY_ASSETS.map(({ code }) => code),
+    {},
+    marketHistoryRange,
+    metalReferenceBaseline,
+  );
+  marketHistory = immediate.rates;
   marketHistoryLoading = true;
   renderMarketHistory();
-  elements.marketHistoryStatus.textContent = "Loading metal price history…";
+  elements.marketHistoryStatus.textContent = immediate.interpolatedIds.length
+    ? "Loading source history · showing clearly marked estimates in the meantime"
+    : "Loading metal price history…";
   const assets = MARKET_HISTORY_ASSETS.map(({ code }) => code).join("|");
   try {
     const response = await fetch(
@@ -711,14 +719,17 @@ async function loadPairHistory() {
       "Add currency pairs to view daily history.";
     return;
   } // If there are no pairs on the board, clear the history and show a message indicating that pairs need to be added.
-  pairHistory = {};
+  const pairs = [...settings.pairs];
+  const immediate = fillMissingWithInterpolation(pairs, {}, historyRange, pairReferenceBaseline);
+  pairHistory = immediate.rates;
   historyUnavailableReason = "";
   historyLoading = true;
   renderPairHistory();
-  elements.historyStatus.textContent = historyRange === "5min" || historyRange === "24h"
-    ? "Checking intraday reference history…"
-    : "Loading daily reference history…";
-  const pairs = [...settings.pairs];
+  elements.historyStatus.textContent = immediate.interpolatedIds.length
+    ? "Loading source history · showing clearly marked estimates in the meantime"
+    : historyRange === "5min" || historyRange === "24h"
+      ? "Checking intraday reference history…"
+      : "Loading daily reference history…";
   const query = encodeURIComponent(
     pairs.map((id) => id.replace("/", ":")).join("|"),
   );
