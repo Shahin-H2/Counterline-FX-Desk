@@ -12,6 +12,8 @@ npm start
 
 Then open <http://127.0.0.1:4173>. The app binds to localhost by default. Set `PORT` or `HOST` to change the development server address. The server has no authentication and is intended for local evaluation, not direct public deployment.
 
+To configure Twelve Data, copy `.env.example` to `.env` and add the API key. Set `TWELVEDATA_EXTERNAL_DISPLAY_LICENSE=confirmed` only after the account has rights for public client-facing display. Twelve Data's Basic free tier does not grant those rights.
+
 Run the focused domain and provider checks with:
 
 ```sh
