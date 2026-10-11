@@ -202,6 +202,7 @@ const newChartState = () => ({
   requestId: 0,
   retries: 0,
   retryTimer: 0,
+  retryWhenVisible: null,
   renderPending: false,
   reorder: null,
 });
@@ -370,7 +371,7 @@ function formatPairRate(rate) {
 // binary-float noise such as 1.4292799999999998, which the decimal parser rejects, so they are
 // rounded to a plain decimal string first.
 function formatChartValue(value) {
-  return formatPairRate(decimalFromNumber(value) ?? "");
+  return formatPairRate(decimalFromNumber(value, 6) ?? "");
 }
 
 // Builds one chart card: its state, its classes and the markup that goes inside it. The card
@@ -411,9 +412,9 @@ function historyCardView(id, observations, series, cardIndex, { market = false, 
   const estimated = kind === "estimated";
   const stale = kind === "stale";
   // Calculate the dimensions and coordinates for the chart, including the min/max values, padding, and scaling for the SVG elements.
-  const width = 680;
-  const height = 190;
-  const plot = { left: 64, right: 666, top: 16, bottom: 143 };
+  const width = 340;
+  const height = 155;
+  const plot = { left: 54, right: 334, top: 10, bottom: 121 };
   const values = points.map((point) => point.value);
   const observedMin = Math.min(...values);
   const observedMax = Math.max(...values);
@@ -442,25 +443,25 @@ function historyCardView(id, observations, series, cardIndex, { market = false, 
   const grid = [high, (high + low) / 2, low]
     .map((value, index) => {
       const y = plot.top + ((plot.bottom - plot.top) * index) / 2;
-      return `<g class="history-gridline"><line x1="${plot.left}" y1="${y.toFixed(2)}" x2="${plot.right}" y2="${y.toFixed(2)}"/><text x="${plot.left - 10}" y="${(y + 4).toFixed(2)}" text-anchor="end">${escapeHtml(formatChartValue(value))}</text></g>`;
+      return `<g class="history-gridline"><line x1="${plot.left}" y1="${y.toFixed(2)}" x2="${plot.right}" y2="${y.toFixed(2)}"/><text x="${plot.left - 7}" y="${(y + 3.5).toFixed(2)}" text-anchor="end">${escapeHtml(formatChartValue(value))}</text></g>`;
     })
     .join(""); // The horizontal grid lines with their max, mid and min labels.
   const pointLabel = estimated ? "Interpolated estimate · " : stale ? "Last observed · " : "";
+  const pointClass = points.length > 40 ? "history-point history-point-dense" : "history-point";
   const dots = coords
     .map(
       (point, index) =>
-        `<circle class="history-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="2.35"><title>${pointLabel}${escapeHtml(formatHistoryTooltip(points[index].date))}: ${escapeHtml(formatPairRate(points[index].rate))} ${escapeHtml(quote)}</title></circle>`,
+        `<circle class="${pointClass}" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="1.9"><title>${pointLabel}${escapeHtml(formatHistoryTooltip(points[index].date))}: ${escapeHtml(formatPairRate(points[index].rate))} ${escapeHtml(quote)}</title></circle>`,
     )
     .join("");
   const latest = points.at(-1);
   const subject = market ? `${asset?.name ?? id} USD reference price` : `${base} to ${quote} reference rate`;
   const ariaLabel = `${estimated ? "Illustrative interpolated estimate of " : stale ? "Last observed " : ""}${subject} from ${formatHistoryTooltip(points[0].date)} to ${formatHistoryTooltip(latest.date)}${series?.source ? `. Source: ${series.source}` : ""}`;
   const latestValue = market ? formatUsdMetalPrice(latest.rate) : formatPairRate(latest.rate);
-  const latestPrefix = market
-    ? estimated ? "Illustrative USD price" : "USD price"
-    : `1 ${escapeHtml(base)} <span aria-hidden="true">=</span>`;
+  const latestPrefix = market ? "USD price" : `1 ${escapeHtml(base)} <span aria-hidden="true">=</span>`;
+  // An estimate ends on the reference price it is anchored to, so the headline names that reference.
   const latestMeta = estimated
-    ? `Estimate · reference ${escapeHtml(series?.baseline?.date ? formatHistoryTooltip(series.baseline.date) : "price")}`
+    ? `${escapeHtml(series?.baseline?.source ?? "Latest")} reference${series?.baseline?.date ? ` · ${escapeHtml(formatHistoryTooltip(series.baseline.date))}` : ""}`
     : `${escapeHtml(market ? id : quote)} · ${stale ? "last observed " : ""}${escapeHtml(formatHistoryTooltip(latest.date))}`;
   const chip = estimated ? "INTERPOLATED ESTIMATE" : stale ? "LAST OBSERVED" : `${points.length} ${points.length === 1 ? "point" : "points"}`;
   const chipTitle = [series?.source, series?.message].filter(Boolean).join(" · ");
@@ -567,6 +568,7 @@ function describeHistory(ids, series, range, retryDelay) {
 async function loadCharts(charts, { ids, url, statusElement, render, emptyMessage, reload }, { retry = false } = {}) {
   const requestId = ++charts.requestId;
   window.clearTimeout(charts.retryTimer);
+  charts.retryWhenVisible = null;
   if (!retry) charts.retries = 0;
   if (!ids.length) {
     charts.data = {};
@@ -595,7 +597,9 @@ async function loadCharts(charts, { ids, url, statusElement, render, emptyMessag
     if (retryDelay) {
       charts.retries += 1;
       charts.retryTimer = window.setTimeout(() => {
+        // A hidden tab spends no provider credits; the check runs when the tab is shown again.
         if (document.visibilityState === "visible") reload({ retry: true });
+        else charts.retryWhenVisible = () => reload({ retry: true });
       }, retryDelay);
     }
     statusElement.textContent = describeHistory(ids, charts.series, range, retryDelay);
@@ -1978,6 +1982,10 @@ loadRates(); // Fetch the latest reference rates for the selected currency pairs
 loadPairHistory(); // Fetch the history charts for the pairs on the board.
 loadMarketHistory();
 loadMarketQuotes();
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  for (const charts of [pairCharts, metalCharts]) charts.retryWhenVisible?.();
+});
 window.setInterval(
   () => {
     if (document.visibilityState !== "visible") return;
