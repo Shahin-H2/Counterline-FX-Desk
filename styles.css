@@ -424,7 +424,6 @@ body.is-card-dragging * { cursor: grabbing !important; }
 .history-line { fill: none; stroke: var(--chart-line); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .history-area { stroke: none; }
 .history-point { fill: #fff; stroke: var(--chart-line); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.history-point-dense { fill: transparent; stroke: transparent; }
 .history-card-footer { display: flex; justify-content: space-between; gap: 8px; margin-top: -3px; padding-top: 9px; border-top: 1px solid #edf1ec; color: #8a968e; font-size: 10px; }
 .history-card-footer > span { display: inline-flex; align-items: center; gap: 4px; }
 .history-card-footer strong { color: #5a6f61; font: 500 10px "DM Mono", monospace; }
@@ -770,7 +769,6 @@ body[data-theme="night"] .history-latest, body[data-theme="night"] .history-late
 body[data-theme="night"] .history-latest strong { color: #c9e2a5; }
 body[data-theme="night"] .history-observation-count { color: #a7b9aa; background: #28382e; }
 body[data-theme="night"] .history-point { fill: #1c2a25; }
-body[data-theme="night"] .history-point-dense { fill: transparent; }
 body[data-theme="night"] .history-card-footer { border-color: #304239; color: #9aada0; }
 body[data-theme="night"] .history-card-footer strong, body[data-theme="night"] .history-empty-state strong,
 body[data-theme="night"] .history-board-empty strong { color: #d4e4d3; }
@@ -949,3 +947,166 @@ body[data-theme="night"] .status-card:hover, body[data-theme="night"] .calc-card
 body[data-theme="night"] .source-note:hover, body[data-theme="night"] .history-card:hover {
   box-shadow: 0 20px 42px rgb(0 0 0 / 25%), 0 0 26px rgb(112 159 119 / 13%);
 }
+
+/* ==========================================================================
+                              Chart read-out
+   Hovering a chart, or tapping it, shows the date and price of the nearest
+   point. src/ui/chart-probe.js places these elements.
+   ========================================================================== */
+.history-section { --chart-line-end: #3f8f96; --probe-glow: 63 143 150; --probe-ring: #fff; }
+body[data-theme="night"] .history-section { --chart-line-end: #7fd9d0; --probe-glow: 150 226 196; --probe-ring: #16232a; }
+.history-chart-wrap { position: relative; margin-top: 8px; }
+.history-chart-wrap .history-chart { margin-top: 0; }
+.history-probe { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .16s ease; }
+.history-card.is-probing .history-probe { opacity: 1; }
+.history-grid.is-reordering .history-probe { opacity: 0; }
+.history-probe-line { position: absolute; top: var(--plot-top); bottom: var(--plot-bottom); left: var(--probe-x, 0); width: 1px; margin-left: -.5px; background: linear-gradient(to bottom, transparent, rgb(var(--probe-glow) / 80%) 16%, rgb(var(--probe-glow) / 80%) 84%, transparent); transition: left .08s ease-out; }
+.history-probe-dot { position: absolute; top: var(--probe-y, 0); left: var(--probe-x, 0); width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 2px solid var(--probe-ring); border-radius: 50%; background: var(--chart-line-end); box-shadow: 0 0 0 1px rgb(var(--probe-glow) / 40%), 0 0 12px rgb(var(--probe-glow) / 70%); transition: left .08s ease-out, top .08s ease-out; }
+.history-probe-dot::after { position: absolute; inset: -8px; border: 1px solid rgb(var(--probe-glow) / 75%); border-radius: 50%; content: ""; animation: probe-pulse 1.6s ease-out infinite; }
+.history-probe-label { position: absolute; top: var(--probe-y, 0); left: var(--label-x, 0); display: grid; justify-items: center; gap: 1px; padding: 6px 10px 7px; border: 1px solid rgb(164 232 208 / 22%); border-radius: 9px; color: #f2f8ef; background: linear-gradient(160deg, rgb(20 46 44 / 94%), rgb(22 30 58 / 94%)); box-shadow: 0 10px 26px rgb(10 26 30 / 32%), 0 0 18px rgb(var(--probe-glow) / 22%); white-space: nowrap; transform: translate(-50%, calc(-100% - 14px)); transition: left .08s ease-out, top .08s ease-out; }
+.history-probe-label.is-below { transform: translate(-50%, 14px); }
+.history-probe-label small { color: #f0cf8c; font: 600 8px/1.35 "DM Mono", monospace; letter-spacing: .8px; text-transform: uppercase; }
+.history-probe-label small:empty { display: none; }
+.history-probe-label strong { font: 700 13px/1.25 "Manrope", sans-serif; letter-spacing: -.2px; font-variant-numeric: tabular-nums; }
+.history-probe-label span { color: #b7cdc4; font: 400 10px/1.3 "DM Mono", monospace; }
+@keyframes probe-pulse {
+  from { opacity: .9; transform: scale(.45); }
+  to { opacity: 0; transform: scale(1.2); }
+}
+
+/* ==========================================================================
+                              Cosmos
+   A slow sky behind the workspace: drifting nebula light, two star fields and
+   an occasional comet, seen through glass surfaces. src/ui/cosmos.js paints
+   the stars once. Everything that loops here animates only transform or
+   opacity, which the browser composites without running style or layout, and
+   the reduced-motion rule above stops all of it.
+   ========================================================================== */
+.cosmos { position: fixed; z-index: 0; inset: 0; overflow: hidden; pointer-events: none; }
+.app-shell { position: relative; z-index: 1; }
+.cosmos-nebula { position: absolute; border-radius: 50%; will-change: transform; }
+.cosmos-nebula-a { top: -30vmax; right: -18vmax; width: 78vmax; height: 78vmax; background: radial-gradient(closest-side, rgb(112 210 180 / 44%), rgb(112 210 180 / 0)); animation: nebula-a 52s steps(208) infinite alternate; }
+.cosmos-nebula-b { bottom: -36vmax; left: -6vmax; width: 84vmax; height: 84vmax; background: radial-gradient(closest-side, rgb(160 146 240 / 30%), rgb(160 146 240 / 0)); animation: nebula-b 64s steps(256) infinite alternate; }
+.cosmos-nebula-c { top: 26vh; left: 38vw; width: 52vmax; height: 52vmax; background: radial-gradient(closest-side, rgb(246 206 132 / 26%), rgb(246 206 132 / 0)); animation: nebula-c 58s steps(232) infinite alternate; }
+.cosmos-stars { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% + 280px); }
+.cosmos-stars-far { transform: translate3d(0, calc(var(--cosmos-scroll, 0) * -.03px), 0); animation: twinkle-far 9s steps(27) infinite alternate; }
+.cosmos-stars-near { transform: translate3d(0, calc(var(--cosmos-scroll, 0) * -.065px), 0); animation: twinkle-near 6.5s steps(20) infinite alternate; }
+.cosmos-comet { position: absolute; top: 9%; left: 70%; width: 150px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, rgb(48 150 128 / 0), rgb(48 150 128 / 65%)); opacity: 0; transform: rotate(155deg); animation: comet 17s ease-in 6s infinite; }
+@keyframes nebula-a { to { transform: translate3d(-9vmax, 7vmax, 0) scale(1.12); } }
+@keyframes nebula-b { to { transform: translate3d(10vmax, -6vmax, 0) scale(1.08); } }
+@keyframes nebula-c { to { transform: translate3d(-7vmax, -8vmax, 0) scale(.9); } }
+@keyframes twinkle-far { from { opacity: .55; } to { opacity: 1; } }
+@keyframes twinkle-near { from { opacity: 1; } to { opacity: .45; } }
+@keyframes comet {
+  0%, 88% { opacity: 0; transform: translate3d(0, 0, 0) rotate(155deg); }
+  90% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(-460px, 215px, 0) rotate(155deg); }
+}
+
+/* Glass: the main surfaces let a little of the sky through their blur. */
+.status-card, .board-main, .calc-card, .source-note, .history-section { background: rgb(255 255 255 / 74%); }
+.semantic-card { background: rgb(241 245 236 / 72%); }
+.history-card { background: rgb(252 253 250 / 66%); }
+.rates-table thead { background: rgb(246 249 244 / 55%); }
+.rates-table tbody tr:hover { background: rgb(240 246 236 / 55%); }
+.table-footnote { background: rgb(250 252 248 / 45%); }
+.markets-section { background: linear-gradient(145deg, rgb(255 255 255 / 70%), rgb(245 249 242 / 76%)); backdrop-filter: blur(14px) saturate(118%); }
+.market-card { background: linear-gradient(145deg, rgb(255 255 255 / 82%), rgb(249 251 247 / 68%)); }
+
+/* A soft light follows the mouse across a card (app.js sets --spot-x and --spot-y),
+   and chart cards gain an aurora edge while they are hovered or focused. */
+.history-card, .status-card { position: relative; isolation: isolate; }
+.history-card::before, .status-card::before, .market-card::after { position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(240px circle at var(--spot-x, 50%) var(--spot-y, 0%), rgb(112 210 180 / 22%), rgb(160 146 240 / 9%) 45%, transparent 70%); content: ""; opacity: 0; pointer-events: none; transition: opacity .3s ease; }
+.history-card::before, .status-card::before { z-index: -1; }
+.market-card::after { z-index: 0; }
+.history-card:hover::before, .status-card:hover::before, .market-card:hover::after { opacity: 1; }
+.history-card::after { position: absolute; inset: 0; padding: 1px; border-radius: inherit; background: linear-gradient(130deg, rgb(88 196 164 / 90%), rgb(150 136 236 / 75%) 48%, rgb(240 196 116 / 85%)); content: ""; opacity: 0; pointer-events: none; transition: opacity .3s ease; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.history-card:hover::after, .history-card:focus-visible::after, .history-card.is-dragging::after, .history-card.is-lifted::after { opacity: 1; }
+.history-card-loading::before, .history-card-loading::after { display: none; }
+
+/* Charts: a two-tone line with a soft glow, drawn in from the left when its data changes. */
+.history-line { filter: drop-shadow(0 3px 4px rgb(63 143 150 / 24%)); }
+.history-card.is-drawing .history-plot { animation: chart-reveal .85s cubic-bezier(.3, .7, .2, 1) both; }
+@keyframes chart-reveal {
+  from { clip-path: inset(-12% 100% -12% -3%); }
+  to { clip-path: inset(-12% -3% -12% -3%); }
+}
+.history-range[aria-pressed="true"] { box-shadow: 0 1px 4px rgb(35 71 51 / 9%), 0 0 0 1px rgb(112 210 180 / 30%), 0 0 16px rgb(112 210 180 / 24%); }
+
+/* The page title catches the light now and then, and its full stop glows like a star. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  h1 { background: linear-gradient(100deg, var(--ink) 0 42%, var(--title-sheen, #2f9e86) 50%, var(--ink) 58% 100%) 100% 0 / 240% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  h1.is-catching-light { animation: title-sheen 1.6s ease-in-out; }
+  .heading-period { -webkit-text-fill-color: var(--lime-dark); }
+}
+.heading-period { position: relative; text-shadow: 0 0 12px rgb(150 196 80 / 55%); }
+.heading-period::after { position: absolute; bottom: -.16em; left: 50%; width: .9em; height: .9em; margin-left: -.45em; border-radius: 50%; background: radial-gradient(closest-side, rgb(170 214 96 / 60%), rgb(170 214 96 / 0)); content: ""; pointer-events: none; animation: star-glow 3.6s ease-in-out infinite alternate; }
+@keyframes title-sheen {
+  from { background-position: 100% 0; }
+  to { background-position: -40% 0; }
+}
+@keyframes star-glow {
+  from { opacity: .25; transform: scale(.7); }
+  to { opacity: 1; transform: scale(1.2); }
+}
+
+/* Small signs of life: status dots send out a ring, the brand squares twinkle in turn,
+   and the primary button catches a sheen on hover. */
+.pulse-dot, .source-dot, .market-live-dot, .status-tag .status-dot { position: relative; }
+.pulse-dot::after, .source-dot::after, .markets-update[data-state="ready"] .market-live-dot::after, .status-tag[data-state="fresh"] .status-dot::after { position: absolute; inset: 0; border-radius: 50%; background: inherit; content: ""; animation: dot-ping 2.6s ease-out infinite; }
+@keyframes dot-ping {
+  from { opacity: .7; transform: scale(1); }
+  70%, to { opacity: 0; transform: scale(3.4); }
+}
+.brand-mark span { position: relative; animation: brand-pop 4.4s ease-in-out infinite; }
+.brand-mark span::after { position: absolute; inset: -6px; border-radius: 50%; background: radial-gradient(closest-side, rgb(217 240 142 / 80%), rgb(217 240 142 / 0)); content: ""; opacity: 0; animation: brand-glow 4.4s ease-in-out infinite; animation-delay: inherit; }
+.brand-mark span:nth-child(2) { animation-delay: 1.1s; }
+.brand-mark span:nth-child(3) { animation-delay: 3.3s; }
+.brand-mark span:nth-child(4) { animation-delay: 2.2s; }
+@keyframes brand-pop {
+  0%, 72%, 100% { transform: scale(1); }
+  84% { transform: scale(1.2); }
+}
+@keyframes brand-glow {
+  0%, 72%, 100% { opacity: 0; }
+  84% { opacity: 1; }
+}
+.button-primary::before { position: absolute; z-index: -1; inset: 0; background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 60%) 50%, transparent 70%); content: ""; transform: translateX(-120%); transition: transform .65s ease; }
+.button-primary:hover::before { transform: translateX(120%); }
+
+/* The sidebar is a strip of night sky in both themes. */
+.sidebar { overflow: hidden; background: linear-gradient(168deg, #163a36 0%, #0f2b30 52%, #131f3d 100%); }
+.sidebar-stars { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; animation: twinkle-far 7s steps(21) infinite alternate; }
+.sidebar::after { position: absolute; z-index: -1; inset: auto -45% -14% -45%; height: 48%; border-radius: 50%; background: radial-gradient(closest-side, rgb(124 108 232 / 36%), rgb(124 108 232 / 0)); content: ""; pointer-events: none; animation: nebula-c 44s steps(176) infinite alternate; }
+
+/* Night: deep space. */
+body[data-theme="night"] {
+  --title-sheen: #9ff0d8;
+  background:
+    radial-gradient(ellipse at 83% 6%, rgb(24 60 58 / 55%) 0, transparent 38%),
+    linear-gradient(180deg, #070d13 0%, #0b171a 58%, #0a1116 100%);
+}
+body[data-theme="night"] .cosmos-nebula-a { background: radial-gradient(closest-side, rgb(38 168 146 / 34%), rgb(38 168 146 / 0)); }
+body[data-theme="night"] .cosmos-nebula-b { background: radial-gradient(closest-side, rgb(118 96 226 / 32%), rgb(118 96 226 / 0)); }
+body[data-theme="night"] .cosmos-nebula-c { background: radial-gradient(closest-side, rgb(206 98 150 / 17%), rgb(206 98 150 / 0)); }
+body[data-theme="night"] .cosmos-comet { background: linear-gradient(90deg, rgb(255 255 255 / 0), rgb(255 255 255 / 92%)); }
+body[data-theme="night"] .status-card, body[data-theme="night"] .board-main, body[data-theme="night"] .calc-card,
+body[data-theme="night"] .source-note, body[data-theme="night"] .history-section { border-color: rgb(132 176 164 / 17%); background: rgb(19 30 32 / 64%); }
+body[data-theme="night"] .semantic-card { border-color: rgb(132 176 164 / 17%); background: rgb(28 42 39 / 62%); }
+body[data-theme="night"] .history-card { border-color: rgb(132 176 164 / 15%); background: rgb(26 39 40 / 58%); }
+body[data-theme="night"] .rates-table thead, body[data-theme="night"] .rates-table th { background: rgb(22 34 35 / 55%); }
+body[data-theme="night"] .rates-table tbody tr:hover { background: rgb(40 62 57 / 42%); }
+body[data-theme="night"] .table-footnote { background: rgb(14 22 25 / 45%); }
+body[data-theme="night"] .markets-section { border-color: rgb(132 176 164 / 18%); background: linear-gradient(145deg, rgb(21 33 34 / 66%), rgb(17 27 30 / 70%)); }
+body[data-theme="night"] .market-card { border-color: rgb(132 176 164 / 16%); background: linear-gradient(145deg, rgb(28 42 41 / 70%), rgb(21 33 34 / 62%)); }
+body[data-theme="night"] .history-card::before, body[data-theme="night"] .status-card::before, body[data-theme="night"] .market-card::after { background: radial-gradient(240px circle at var(--spot-x, 50%) var(--spot-y, 0%), rgb(126 226 196 / 16%), rgb(150 130 240 / 9%) 45%, transparent 70%); }
+body[data-theme="night"] .history-line { filter: drop-shadow(0 0 5px rgb(150 226 196 / 50%)); }
+body[data-theme="night"] .history-range[aria-pressed="true"] { box-shadow: 0 1px 4px rgb(0 0 0 / 18%), 0 0 0 1px rgb(126 226 196 / 26%), 0 0 16px rgb(126 226 196 / 20%); }
+body[data-theme="night"] .heading-period { text-shadow: 0 0 14px rgb(190 228 120 / 65%); }
+body[data-theme="night"] .sidebar { background: linear-gradient(168deg, #10282a 0%, #0a1a20 55%, #0e1530 100%); }
+body[data-theme="night"] .source-type { border-color: rgb(132 176 164 / 24%); color: #b9cbbd; background: rgb(255 255 255 / 6%); }
+body[data-theme="night"] .pair-total { color: #a9bbb0; background: rgb(255 255 255 / 7%); }
+body[data-theme="night"] .status-tag { color: #c4e7a6; background: rgb(150 204 120 / 15%); }
+body[data-theme="night"] .status-tag[data-state="stale"], body[data-theme="night"] .status-tag[data-state="partial"],
+body[data-theme="night"] .status-tag[data-state="cached"] { color: #f0cf8c; background: rgb(232 184 96 / 15%); }
+body[data-theme="night"] .status-tag[data-state="error"] { color: #f2b5aa; background: rgb(224 124 110 / 16%); }
