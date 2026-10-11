@@ -380,21 +380,35 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
 .history-resolution-note { display: flex; align-items: flex-start; gap: 8px; margin: 17px 0 12px; padding: 9px 11px; border: 1px solid #e6ece4; border-radius: 5px; color: #718176; background: #f8faf6; font-size: 11px; line-height: 1.45; }
 .history-resolution-note > span { color: #6e8f5f; font-size: 14px; line-height: 1; }
 .history-status { min-height: 19px; margin: 0 0 10px; color: #829087; font: 500 11px "DM Mono", monospace; }
-.history-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.history-card { min-width: 0; padding: 15px 15px 12px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #fcfdfa; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; animation: enter-up .38s ease-out both; }
+.history-grid { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.history-card { min-width: 0; padding: 15px 15px 12px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #fcfdfa; transition: transform 0.2s ease, border-color .2s ease, box-shadow .2s ease; }
+/* Only a newly added card plays the entrance. `backwards` hands transform and opacity back when it ends. */
+.history-card.is-entering { animation: enter-up .38s ease-out backwards; }
 .history-card:hover { transform: translateY(-2px); border-color: #cbdaca; box-shadow: 0 9px 22px rgb(24 61 49 / 8%); }
-.history-card[draggable="true"] { cursor: grab; user-select: none; }
-.history-card.is-dragging { z-index: 5; cursor: grabbing; opacity: .7; transform: scale(1.02); border-color: #8ca77e; box-shadow: 0 18px 34px rgb(24 61 49 / 20%); animation: none; }
-.history-card-drop-target { border-color: #8ca77e; box-shadow: 0 0 0 2px rgb(140 167 126 / 18%); }
+.history-card:focus-visible { outline: 2px solid #83a75e; outline-offset: 2px; }
+/* Drag to reorder (src/ui/card-reorder.js). A card is picked up like an iOS widget: it lifts,
+   follows the pointer through --drag-x / --drag-y, and its neighbours slide aside using the
+   `transition: transform 0.2s ease` above. */
+.history-card[data-history-card-id] { cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.history-card[data-history-card-id]:active { cursor: grabbing; }
+.history-card.is-dragging, .history-card.is-lifted { position: relative; z-index: 5; cursor: grabbing; transform: scale(1.02); border-color: #8ca77e; box-shadow: 0 18px 34px rgb(24 61 49 / 20%); }
+/* `translate` is left out of the transition so the card tracks the pointer without lag. */
+.history-card.is-dragging { opacity: .7; translate: var(--drag-x, 0) var(--drag-y, 0); transition: transform 0.2s ease, opacity .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.history-card.is-settling { position: relative; z-index: 4; transition: translate 0.2s ease, transform 0.2s ease, opacity .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.history-grid.is-reordering { cursor: grabbing; }
+.history-grid.is-reordering .history-card:hover:not(.is-dragging, .is-lifted) { transform: none; border-color: var(--line); box-shadow: none; }
+body.is-card-dragging { user-select: none; -webkit-user-select: none; }
+body.is-card-dragging * { cursor: grabbing !important; }
 .history-card-interpolated { border-style: dashed; }
+.history-card-stale .history-observation-count { color: #81652f; background: #f6f0df; font: 600 8px/1.25 "DM Mono", monospace; letter-spacing: .15px; }
 .history-card-interpolated .history-observation-count { max-width: 132px; color: #81652f; background: #f6f0df; font: 600 8px/1.25 "DM Mono", monospace; letter-spacing: .15px; white-space: normal; text-align: center; }
 .history-card-loading:hover { transform: none; box-shadow: none; }
 .history-card-loading > * { border-radius: 4px; background: linear-gradient(100deg, #f0f4ef 30%, #e7eee6 45%, #f0f4ef 60%); background-size: 200% 100%; animation: chart-shimmer 1.25s ease-in-out infinite; }
 .history-loading-line { width: 46%; height: 16px; }
 .history-loading-rate { width: 63%; height: 24px; margin-top: 13px; }
 .history-loading-chart { height: 150px; margin-top: 10px; }
-.history-card:nth-child(3n + 2) { animation-delay: .04s; }
-.history-card:nth-child(3n) { animation-delay: .08s; }
+.history-card.is-entering:nth-child(3n + 2) { animation-delay: .04s; }
+.history-card.is-entering:nth-child(3n) { animation-delay: .08s; }
 .history-card-title { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .history-card-title h3 { margin: 0; color: #263d34; font: 700 15px/1.3 "Manrope", sans-serif; letter-spacing: -.2px; }
 .history-card-title h3 span { margin: 0 3px; color: #89a17e; }
@@ -605,6 +619,7 @@ body {
 .markets-heading p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .markets-update { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; padding: 8px 11px; border: 1px solid #dce8dc; border-radius: 999px; color: #607469; background: rgb(251 253 249 / 82%); font-size: 11px; font-weight: 600; }
 .market-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #c48b4d; box-shadow: 0 0 0 4px rgb(196 139 77 / 12%); }
+.markets-update[data-state="ready"] .market-live-dot { background: #6c9f6b; box-shadow: 0 0 0 4px rgb(108 159 107 / 14%); }
 .markets-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
 .market-card {
   --asset-tint: 110 158 126;
@@ -744,9 +759,10 @@ body[data-theme="night"] .history-resolution-note { border-color: #35493e; color
 body[data-theme="night"] .history-resolution-note > span { color: #b5d388; }
 body[data-theme="night"] .history-card { border-color: #304239; background: #1c2a25; }
 body[data-theme="night"] .history-card:hover { border-color: #4a6352; box-shadow: 0 9px 22px rgb(0 0 0 / 18%); }
-body[data-theme="night"] .history-card.is-dragging { border-color: #9cba7d; box-shadow: 0 18px 34px rgb(0 0 0 / 32%); }
-body[data-theme="night"] .history-card-drop-target { border-color: #9cba7d; box-shadow: 0 0 0 2px rgb(156 186 125 / 20%); }
-body[data-theme="night"] .history-card-interpolated .history-observation-count { color: #e5ca88; background: #403927; }
+body[data-theme="night"] .history-card.is-dragging, body[data-theme="night"] .history-card.is-lifted { border-color: #9cba7d; box-shadow: 0 18px 34px rgb(0 0 0 / 32%); }
+body[data-theme="night"] .history-grid.is-reordering .history-card:hover:not(.is-dragging, .is-lifted) { border-color: #304239; }
+body[data-theme="night"] .history-card-interpolated .history-observation-count,
+body[data-theme="night"] .history-card-stale .history-observation-count { color: #e5ca88; background: #403927; }
 body[data-theme="night"] .history-card-loading > * { background: linear-gradient(100deg, #26362e 30%, #304339 45%, #26362e 60%); background-size: 200% 100%; }
 body[data-theme="night"] .history-latest, body[data-theme="night"] .history-latest small { color: #9aada0; }
 body[data-theme="night"] .history-latest strong { color: #c9e2a5; }
