@@ -15,6 +15,18 @@ export function toPlainDecimal(value) {
   return `${digits.slice(0, decimalIndex)}.${digits.slice(decimalIndex)}`;
 }
 
+// Turns a computed number into a plain decimal string that parseDecimal accepts: no exponent,
+// no binary-float noise (1.4292799999999998), and never more than `maxScale` fraction digits.
+export function decimalFromNumber(value, significantDigits = 7, maxScale = 12) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0 || number >= 1e21) return null;
+  const magnitude = Math.floor(Math.log10(number));
+  const scale = Math.min(maxScale, Math.max(0, significantDigits - 1 - magnitude));
+  const fixed = number.toFixed(scale);
+  const plain = fixed.includes(".") ? fixed.replace(/0+$/, "").replace(/\.$/, "") : fixed;
+  return /[1-9]/.test(plain) ? plain : null;
+}
+
 export function parseDecimal(value, { maxScale = 12, maxDigits = 30 } = {}) {
   const plain = toPlainDecimal(value);
   const match = DECIMAL_PATTERN.exec(plain);
