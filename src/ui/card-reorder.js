@@ -37,6 +37,7 @@ export function createCardReorder(grid, {
   itemSelector = "[data-history-card-id]",
   getId = (card) => card.dataset.historyCardId,
   getName = (card) => card.dataset.cardName ?? getId(card),
+  onPickUp = () => {}, // (cards) as a card is lifted, before anything moves
   onReorder = () => {}, // (ids) once a move is committed
   onIdle = () => {}, // when a drag or keyboard move has completely finished
   announce = () => {},
@@ -149,7 +150,7 @@ export function createCardReorder(grid, {
     } catch {
       // The pointer is already gone; pointerup or pointercancel will follow.
     }
-    for (const element of cards()) element.classList.remove("is-entering");
+    onPickUp(cards());
     grid.classList.add("is-reordering");
     document.body.classList.add("is-card-dragging");
     card.classList.add("is-dragging");
@@ -271,7 +272,7 @@ export function createCardReorder(grid, {
     card = target;
     startOrder = currentOrder();
     state = "lifted";
-    for (const element of cards()) element.classList.remove("is-entering");
+    onPickUp(cards());
     grid.classList.add("is-reordering");
     card.classList.add("is-lifted");
     announce(`${getName(card)} picked up. Use the arrow keys to move it, Space to drop it, Escape to cancel.`);
