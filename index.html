@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#132b2c" />
     <meta name="description" content="A clear market watch for currency references, exchange prices and commodity benchmarks." />
     <title>Counterline — Market watch</title>
+    <link rel="icon" href="data:," />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
@@ -235,7 +236,7 @@
             <div class="history-heading">
               <div class="card-kicker">RATE MOVEMENT</div>
               <h2 id="history-title">Currency pair history</h2>
-              <p>Drag cards to reorder them. Estimates are labeled when provider history is unavailable.</p>
+              <p>Drag a card to reorder it; the order is saved in this browser. A chart is labelled when it is an estimate.</p>
             </div>
             <div class="history-controls" role="group" aria-label="Chart time range" aria-describedby="history-resolution-note">
               <button class="history-range" type="button" data-history-range="5min" aria-pressed="false">5 min</button>
@@ -246,7 +247,7 @@
               <button class="history-range" type="button" data-history-range="6m" aria-pressed="false">6 months</button>
             </div>
           </header>
-          <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span> Daily currency history uses Frankfurter. 24-hour and 5-minute FX history uses <a href="https://twelvedata.com/" target="_blank" rel="noreferrer">Twelve Data</a> when configured. If data is unavailable, the chart labels an interpolation from the latest saved reference rate; it is not observed market history.</p>
+          <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span> Daily history is Frankfurter's reference data. The 5-minute and 24-hour views use <a href="https://twelvedata.com/" target="_blank" rel="noreferrer">Twelve Data</a> when it is configured. Otherwise, and whenever its rate limit is reached, they show an interpolated estimate that ends on the latest Frankfurter reference rate. An estimate is always labelled; it is not observed market history.</p>
           <div class="history-status" id="history-status" role="status" aria-live="polite">Loading daily history…</div>
           <div class="history-grid" id="history-grid" role="list" aria-label="Currency pair history charts"></div>
         </section>
@@ -260,7 +261,7 @@
             </div>
             <div class="markets-update" id="markets-status" role="status" aria-live="polite">
               <span class="market-live-dot" aria-hidden="true"></span>
-              <span>Twelve Data access needed</span>
+              <span>Loading gold and silver…</span>
             </div>
           </header>
 
@@ -268,16 +269,16 @@
             <article class="market-card market-card-gold" data-market-code="XAU" role="listitem">
               <div class="market-card-top"><span class="market-symbol">Au</span><span class="market-kind">PRECIOUS METAL</span></div>
               <div class="market-card-name"><h3>Gold</h3><span>XAU</span></div>
-              <div class="market-value market-value-unavailable" data-market-value>Twelve Data needed</div>
+              <div class="market-value market-value-unavailable" data-market-value>Loading…</div>
               <div class="market-unit">USD <span>·</span> per troy ounce</div>
-              <div class="market-card-bottom"><span class="market-change market-change-pending">Spot feed</span><span class="market-observation">Access needed</span></div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Reference price</span><span class="market-observation">Loading…</span></div>
             </article>
             <article class="market-card market-card-silver" data-market-code="XAG" role="listitem">
               <div class="market-card-top"><span class="market-symbol">Ag</span><span class="market-kind">PRECIOUS METAL</span></div>
               <div class="market-card-name"><h3>Silver</h3><span>XAG</span></div>
-              <div class="market-value market-value-unavailable" data-market-value>Twelve Data needed</div>
+              <div class="market-value market-value-unavailable" data-market-value>Loading…</div>
               <div class="market-unit">USD <span>·</span> per troy ounce</div>
-              <div class="market-card-bottom"><span class="market-change market-change-pending">Spot feed</span><span class="market-observation">Access needed</span></div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Reference price</span><span class="market-observation">Loading…</span></div>
             </article>
             <article class="market-card market-card-oil" role="listitem">
               <div class="market-card-top"><span class="market-symbol">WTI</span><span class="market-kind">ENERGY</span></div>
@@ -297,7 +298,7 @@
 
           <footer class="markets-footnote">
             <span class="markets-footnote-mark" aria-hidden="true">i</span>
-            <p>Reference-market values are not counter offers. Gold and silver use <a href="https://twelvedata.com/" target="_blank" rel="noreferrer">Twelve Data</a> when a licensed source is configured. Oil needs a separate source.</p>
+            <p>Reference-market values are not counter offers. Gold and silver show <a href="https://frankfurter.dev/" target="_blank" rel="noreferrer">Frankfurter</a>'s daily reference price, or the latest <a href="https://twelvedata.com/" target="_blank" rel="noreferrer">Twelve Data</a> price when that source is configured. Oil needs a separate source.</p>
           </footer>
         </section>
 
@@ -306,7 +307,7 @@
             <div class="history-heading">
               <div class="card-kicker">PRECIOUS METAL MOVEMENT</div>
               <h2 id="market-history-title">Gold &amp; silver price history</h2>
-              <p>Drag cards to reorder them. Reference prices in USD per troy ounce.</p>
+              <p>Drag a card to reorder it. Reference prices in USD per troy ounce.</p>
             </div>
             <div class="history-controls market-history-controls" role="group" aria-label="Metal chart time range" aria-describedby="market-history-resolution-note">
               <button class="history-range" type="button" data-market-history-range="5min" aria-pressed="false">5 min</button>
@@ -317,8 +318,8 @@
               <button class="history-range" type="button" data-market-history-range="6m" aria-pressed="false">6 months</button>
             </div>
           </header>
-          <p class="history-resolution-note" id="market-history-resolution-note"><span aria-hidden="true">ⓘ</span> Twelve Data supplies gold and silver history when configured. If data is unavailable, a chart labels any interpolation from the latest saved metal quote; it is not observed market history.</p>
-          <div class="history-status" id="market-history-status" role="status" aria-live="polite">No metals history source selected.</div>
+          <p class="history-resolution-note" id="market-history-resolution-note"><span aria-hidden="true">ⓘ</span> Gold and silver use Twelve Data when it is configured. Without it, the daily views show Frankfurter's reference history, and the 5-minute and 24-hour views show a labelled estimate that ends on the latest Frankfurter reference price. An estimate is not observed market history.</p>
+          <div class="history-status" id="market-history-status" role="status" aria-live="polite">Loading metal price history…</div>
           <div class="history-grid market-history-grid" id="market-history-grid" role="list" aria-label="Gold and silver history charts"></div>
         </section>
 
@@ -356,6 +357,7 @@
       </form>
     </dialog>
 
+    <p class="sr-only" id="chart-reorder-help">To move this chart card, press Space, use the arrow keys, then press Space again. Escape cancels.</p>
     <div class="sr-only" id="announcements" aria-live="polite" aria-atomic="true"></div>
   </body>
 </html>
