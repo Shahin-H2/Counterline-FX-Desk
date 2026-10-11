@@ -2,6 +2,9 @@ import { fetchFrankfurterRates, FRANKFURTER_SOURCE } from "./frankfurter-provide
 
 const pairKey = (pair) => `${pair.base}/${pair.quote}`;
 const cacheKeyFor = (pairs) => pairs.map(pairKey).sort().join("|");
+// A response that had to lean on older rates is retried sooner than a clean one.
+const DEGRADED_TTL_MS = 60 * 1000;
+const MAX_CACHED_PAIR_SETS = 200;
 
 export function createReferenceService({
   provider = fetchFrankfurterRates,
@@ -19,12 +22,21 @@ export function createReferenceService({
         const cacheStatus = previous.payload.cacheStatus === "fresh" ? "cached" : previous.payload.cacheStatus;
         return { ...previous.payload, checkedAt: instant.toISOString(), cacheStatus };
       }
+      const lastGood = previous && Object.keys(previous.payload.rates).length ? previous.payload : null;
+      const staleResponse = () => ({
+        ...lastGood,
+        checkedAt: instant.toISOString(),
+        cacheStatus: "stale-cache",
+        errors: [{ message: "The reference provider could not be reached; showing the last successful server cache." }],
+      });
 
       try {
         const result = await provider(pairs);
+        // Nothing came back at all: keep the last good response and its original retrieval time.
+        if (lastGood && !Object.keys(result.rates ?? {}).length) return staleResponse();
         const oldRates = previous?.payload.rates ?? {};
         const rates = { ...result.rates };
-        const errors = result.errors ?? [];
+        const errors = [...(result.errors ?? [])];
         const fallbackPairs = [];
         for (const pair of pairs) {
           const key = pairKey(pair);
@@ -45,17 +57,15 @@ export function createReferenceService({
           fallbackPairs,
           cacheStatus: fallbackPairs.length ? "partial-cache" : errors.length ? "partial" : "fresh",
         };
-        if (Object.keys(rates).length) cache.set(key, { payload, expiresAt: instant.getTime() + cacheTtlMs });
+        if (Object.keys(rates).length) {
+          const ttl = fallbackPairs.length || errors.length ? Math.min(cacheTtlMs, DEGRADED_TTL_MS) : cacheTtlMs;
+          cache.delete(key);
+          cache.set(key, { payload, expiresAt: instant.getTime() + ttl });
+          if (cache.size > MAX_CACHED_PAIR_SETS) cache.delete(cache.keys().next().value);
+        }
         return { ...payload, checkedAt: instant.toISOString() };
       } catch {
-        if (previous && Object.keys(previous.payload.rates).length) {
-          return {
-            ...previous.payload,
-            checkedAt: instant.toISOString(),
-            cacheStatus: "stale-cache",
-            errors: [{ message: "The reference provider could not be reached; showing the last successful server cache." }],
-          };
-        }
+        if (lastGood) return staleResponse();
         throw new Error("Reference provider unavailable.");
       }
     },
