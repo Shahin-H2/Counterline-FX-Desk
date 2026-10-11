@@ -9,6 +9,8 @@ import {
 } from "./domain/decimal.js";
 import { isObservationStale } from "./domain/freshness.js";
 import { createCardReorder } from "./ui/card-reorder.js";
+import { createChartProbe } from "./ui/chart-probe.js";
+import { createCosmos } from "./ui/cosmos.js";
 
 // Storage keys
 const STORAGE_KEY = "counterline-fx-prices-v1";
@@ -220,6 +222,11 @@ const HISTORY_RANGE_LABELS = {
 const SERIES_KINDS = new Set(["observed", "reference", "stale", "estimated"]);
 const MAX_HISTORY_RETRIES = 3;
 const renderedCardMarkup = new WeakMap(); // card element -> the markup last written into it
+const chartGeometry = new WeakMap(); // card element -> its chart's points, for the hover read-out
+const cosmos = createCosmos({
+  backdrop: document.querySelector(".cosmos"),
+  sidebar: document.querySelector(".sidebar"),
+});
 const MARKET_HISTORY_ASSETS = [
   { code: "XAU", name: "Gold", detail: "USD per troy ounce" },
   { code: "XAG", name: "Silver", detail: "USD per troy ounce" },
@@ -446,14 +453,12 @@ function historyCardView(id, observations, series, cardIndex, { market = false, 
       return `<g class="history-gridline"><line x1="${plot.left}" y1="${y.toFixed(2)}" x2="${plot.right}" y2="${y.toFixed(2)}"/><text x="${plot.left - 7}" y="${(y + 3.5).toFixed(2)}" text-anchor="end">${escapeHtml(formatChartValue(value))}</text></g>`;
     })
     .join(""); // The horizontal grid lines with their max, mid and min labels.
-  const pointLabel = estimated ? "Interpolated estimate · " : stale ? "Last observed · " : "";
-  const pointClass = points.length > 40 ? "history-point history-point-dense" : "history-point";
-  const dots = coords
-    .map(
-      (point, index) =>
-        `<circle class="${pointClass}" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="1.9"><title>${pointLabel}${escapeHtml(formatHistoryTooltip(points[index].date))}: ${escapeHtml(formatPairRate(points[index].rate))} ${escapeHtml(quote)}</title></circle>`,
-    )
-    .join("");
+  // A short series gets a marker on every point; on a long one they would merge into a band.
+  const dots = points.length > 40
+    ? ""
+    : coords
+        .map((point) => `<circle class="history-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="1.9"/>`)
+        .join("");
   const latest = points.at(-1);
   const subject = market ? `${asset?.name ?? id} USD reference price` : `${base} to ${quote} reference rate`;
   const ariaLabel = `${estimated ? "Illustrative interpolated estimate of " : stale ? "Last observed " : ""}${subject} from ${formatHistoryTooltip(points[0].date)} to ${formatHistoryTooltip(latest.date)}${series?.source ? `. Source: ${series.source}` : ""}`;
@@ -465,17 +470,34 @@ function historyCardView(id, observations, series, cardIndex, { market = false, 
     : `${escapeHtml(market ? id : quote)} · ${stale ? "last observed " : ""}${escapeHtml(formatHistoryTooltip(latest.date))}`;
   const chip = estimated ? "INTERPOLATED ESTIMATE" : stale ? "LAST OBSERVED" : `${points.length} ${points.length === 1 ? "point" : "points"}`;
   const chipTitle = [series?.source, series?.message].filter(Boolean).join(" · ");
+  const strokeId = `${gradientId}-stroke`;
+  const percent = (value) => `${((value / height) * 100).toFixed(2)}%`;
   return {
     kind,
     name,
     className: `history-card${estimated ? " history-card-interpolated" : ""}${stale ? " history-card-stale" : ""}`,
+    // For the hover read-out: where each point sits in the chart's own units, with its date and rate.
+    chart: {
+      width,
+      height,
+      market,
+      quote,
+      kind,
+      points: coords.map((point, index) => ({ x: point.x, y: point.y, date: points[index].date, rate: points[index].rate })),
+    },
     html: `<div class="history-card-title">${heading}<span class="history-observation-count"${chipTitle ? ` title="${escapeHtml(chipTitle)}"` : ""}>${chip}</span></div>
     <div class="history-latest"><span>${latestPrefix}</span><strong>${escapeHtml(latestValue)}</strong><small>${latestMeta}</small></div>
-    <svg class="history-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(ariaLabel)}">
-      <defs><linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="var(--chart-line)" stop-opacity=".2"/><stop offset="100%" stop-color="var(--chart-line)" stop-opacity="0"/></linearGradient></defs>
-      ${grid}<path class="history-area" d="${area}" fill="url(#${gradientId})"/><path class="history-line" d="${line}"/>${dots}
-      <text class="history-axis-label" x="${plot.left}" y="${height - 5}">${escapeHtml(formatHistoryAxis(points[0].date, range))}</text><text class="history-axis-label" x="${plot.right}" y="${height - 5}" text-anchor="end">${escapeHtml(formatHistoryAxis(latest.date, range))}</text>
-    </svg>
+    <div class="history-chart-wrap">
+      <svg class="history-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(ariaLabel)}">
+        <defs>
+          <linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="var(--chart-line)" stop-opacity=".2"/><stop offset="100%" stop-color="var(--chart-line)" stop-opacity="0"/></linearGradient>
+          <linearGradient id="${strokeId}" gradientUnits="userSpaceOnUse" x1="${plot.left}" y1="0" x2="${plot.right}" y2="0"><stop offset="0%" stop-color="var(--chart-line)"/><stop offset="100%" stop-color="var(--chart-line-end, var(--chart-line))"/></linearGradient>
+        </defs>
+        ${grid}<g class="history-plot"><path class="history-area" d="${area}" fill="url(#${gradientId})"/><path class="history-line" d="${line}" style="stroke:url(#${strokeId})"/>${dots}</g>
+        <text class="history-axis-label" x="${plot.left}" y="${height - 5}">${escapeHtml(formatHistoryAxis(points[0].date, range))}</text><text class="history-axis-label" x="${plot.right}" y="${height - 5}" text-anchor="end">${escapeHtml(formatHistoryAxis(latest.date, range))}</text>
+      </svg>
+      <div class="history-probe" aria-hidden="true" style="--plot-top:${percent(plot.top)};--plot-bottom:${percent(height - plot.bottom)}"><i class="history-probe-line"></i><i class="history-probe-dot"></i><div class="history-probe-label"><small></small><strong></strong><span></span></div></div>
+    </div>
     <div class="history-card-footer"><span><i class="history-stat-dot history-stat-low"></i>${estimated ? "Est. low" : "Low"} <strong>${escapeHtml(formatChartValue(observedMin))}</strong></span><span><i class="history-stat-dot"></i>${estimated ? "Est. high" : "High"} <strong>${escapeHtml(formatChartValue(observedMax))}</strong></span></div>`,
   };
 }
@@ -501,12 +523,19 @@ function renderHistoryCards(grid, ids, viewFor) {
       card.tabIndex = 0;
       card.classList.add("is-entering");
     }
-    card.className = `${view.className}${card.classList.contains("is-entering") ? " is-entering" : ""}`;
+    // Classes that describe a moment, not the data, survive the re-render.
+    const momentary = ["is-entering", "is-drawing", "is-probing"].filter((name) => card.classList.contains(name));
+    card.className = [view.className, ...momentary].join(" ");
     card.dataset.seriesKind = view.kind;
     card.dataset.cardName = view.name;
+    card.dataset.pointCount = String(view.chart?.points.length ?? 0);
+    chartGeometry.set(card, view.chart ?? null);
     if (renderedCardMarkup.get(card) !== view.html) {
       card.innerHTML = view.html;
       renderedCardMarkup.set(card, view.html);
+      // A chart that has just changed draws itself in, and any read-out belonged to the old one.
+      card.classList.toggle("is-drawing", Boolean(view.chart));
+      card.classList.remove("is-probing");
     }
     const expected = previous ? previous.nextElementSibling : grid.firstElementChild;
     if (expected !== card) grid.insertBefore(card, expected);
@@ -739,6 +768,15 @@ function announce(message) {
   window.setTimeout(() => {
     elements.announcements.textContent = message;
   }, 30);
+}
+
+// Lets a band of light cross the page title once; used when fresh reference rates arrive.
+function catchLight() {
+  const title = document.querySelector("h1");
+  if (!title) return;
+  title.classList.remove("is-catching-light");
+  void title.offsetWidth; // so that adding the class again restarts the animation
+  title.classList.add("is-catching-light");
 }
 
 // Update the feed status pill in the navigation bar and sidebar with the given label and state, reflecting the current status of the reference feed.
@@ -1095,6 +1133,7 @@ async function loadRates({ announceSuccess = false } = {}) {
     }
     renderTable({ animateRows: !hasAnimatedRows });
     renderCalculator();
+    catchLight();
     if (announceSuccess) announce("Reference rates refreshed.");
   } catch {
     const cached = readReferenceCache();
@@ -1443,6 +1482,7 @@ function flipPairDirection(id) {
 // Apply the current view preferences (theme, density, filter, sort) to the document body and relevant UI elements. Optionally persist the preferences to localStorage for future sessions.
 function applyViewPreferences({ persist = true } = {}) {
   document.body.dataset.theme = view.theme; // Apply the selected theme (light or dark) to the document body, allowing CSS to style the application accordingly.
+  cosmos.setTheme(view.theme); // The star fields are painted in the theme's colours.
   document.body.dataset.density = view.density; // Apply the selected density (comfortable or compact) to the document body, allowing CSS to adjust spacing and layout for the rates table and other UI elements.
   elements.pairFilter.value = view.filter; // Set the filter dropdown in the UI to reflect the current view filter (e.g., all, priced, needs-prices, reference-issues), allowing users to see which filter is active.
   elements.pairSort.value = view.sort; // Set the sort dropdown in the UI to reflect the current view sort option (e.g., code, name, rate-high, rate-low, board), allowing users to see which sorting method is active.
@@ -1663,7 +1703,24 @@ function initializeEvents() {
         : `${label} card order changed for this session; browser storage is unavailable.`,
     );
   };
+  // Hovering a chart (or tapping it) reads out the date and price of the nearest point.
+  const chartProbe = createChartProbe({
+    grids: [elements.historyGrid, elements.marketHistoryGrid],
+    chartFor: (card) => chartGeometry.get(card),
+    describe: (chart, point) => ({
+      tag: chart.kind === "estimated" ? "Estimate" : chart.kind === "stale" ? "Last observed" : "",
+      value: chart.market ? formatUsdMetalPrice(point.rate) : `${formatPairRate(point.rate)} ${chart.quote}`,
+      when: formatHistoryTooltip(point.date),
+    }),
+    isBusy: () => Boolean(pairCharts.reorder?.isActive() || metalCharts.reorder?.isActive()),
+  });
+  // Moving a card in the DOM replays its running animations, so they end when a card is picked up.
+  const settleCards = (cards) => {
+    chartProbe.hide();
+    for (const card of cards) card.classList.remove("is-entering", "is-drawing", "is-probing");
+  };
   pairCharts.reorder = createCardReorder(elements.historyGrid, {
+    onPickUp: settleCards,
     onReorder: (order) => {
       pairHistoryOrder = reconcileChartOrder(order, settings.pairs);
       saveCardOrder("Currency history", PAIR_HISTORY_ORDER_KEY, pairHistoryOrder);
@@ -1674,6 +1731,7 @@ function initializeEvents() {
     announce,
   });
   metalCharts.reorder = createCardReorder(elements.marketHistoryGrid, {
+    onPickUp: settleCards,
     onReorder: (order) => {
       marketHistoryOrder = reconcileChartOrder(order, MARKET_HISTORY_ASSETS.map(({ code }) => code));
       saveCardOrder("Metals history", METAL_HISTORY_ORDER_KEY, marketHistoryOrder);
@@ -1686,8 +1744,18 @@ function initializeEvents() {
   for (const grid of [elements.historyGrid, elements.marketHistoryGrid]) {
     grid.addEventListener("animationend", (event) => {
       if (event.animationName === "enter-up") event.target.classList.remove("is-entering");
+      if (event.animationName === "chart-reveal") event.target.closest("[data-history-card-id]")?.classList.remove("is-drawing");
     });
   }
+  // Cards carry a soft light that follows the mouse; styles.css reads the position from here.
+  document.addEventListener("pointermove", (event) => {
+    if (event.pointerType !== "mouse") return;
+    const card = event.target.closest?.(".history-card, .market-card, .status-card");
+    if (!card) return;
+    const bounds = card.getBoundingClientRect();
+    card.style.setProperty("--spot-x", `${event.clientX - bounds.left}px`);
+    card.style.setProperty("--spot-y", `${event.clientY - bounds.top}px`);
+  }, { passive: true });
   let draggedPairId = null; // Track the ID of the currency pair currently being dragged for reordering on the board, allowing the application to manage drag-and-drop interactions and update the order of pairs accordingly.
   document.addEventListener("pointerdown", (event) => {
     const button = event.target.closest(".button"); // Add a visual "tapped" effect to buttons when they are pressed, unless the user has requested reduced motion.
