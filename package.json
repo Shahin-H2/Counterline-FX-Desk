@@ -1,11 +1,21 @@
 {
   "name": "counterline-fx-desk",
+  "productName": "Counterline FX Desk",
   "version": "1.0.0",
+  "description": "Exchange desk pricing: reference rates, your own buy and sell prices, and a customer display.",
+  "author": "Shahin-H2",
   "private": true,
   "type": "module",
+  "main": "desktop/main.mjs",
   "scripts": {
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "desktop": "electron .",
+    "dist": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3"
   }
 }
