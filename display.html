@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b171a" />
+    <meta name="description" content="Today's buy and sell exchange rates." />
+    <title>Counterline — Exchange rates</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/src/display.js"></script>
+  </head>
+  <body class="display-page" data-theme="night">
+    <div class="cosmos" aria-hidden="true">
+      <span class="cosmos-nebula cosmos-nebula-a"></span>
+      <span class="cosmos-nebula cosmos-nebula-b"></span>
+      <span class="cosmos-nebula cosmos-nebula-c"></span>
+      <canvas class="cosmos-stars cosmos-stars-far"></canvas>
+      <canvas class="cosmos-stars cosmos-stars-near"></canvas>
+      <span class="cosmos-comet"></span>
+    </div>
+    <main class="display">
+      <header class="display-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+          <span class="brand-copy"><strong>counterline</strong><small>EXCHANGE RATES</small></span>
+        </div>
+        <div class="display-clock"><strong id="display-time"></strong><span id="display-date"></span></div>
+      </header>
+      <section class="display-board" id="display-board" aria-live="polite" aria-label="Buy and sell rates"></section>
+      <footer class="display-footer">
+        <span id="display-updated"></span>
+        <span>Rates are quote currency per 1 unit of the base currency and may change without notice.</span>
+        <button class="button button-secondary" id="display-fullscreen" type="button">Full screen</button>
+      </footer>
+    </main>
+  </body>
+</html>
