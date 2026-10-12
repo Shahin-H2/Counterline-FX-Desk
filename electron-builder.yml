@@ -1,0 +1,32 @@
+# How `npm run dist` packages the desktop app. Options: https://www.electron.build/configuration
+appId: io.github.shahin-h2.counterline-fx-desk
+productName: Counterline FX Desk
+directories:
+  output: dist
+
+# Only what the app runs on goes into an installer. Everything else in this folder stays out of
+# it, including .env, the tests and the notes.
+files:
+  - package.json
+  - server.mjs
+  - index.html
+  - display.html
+  - styles.css
+  - src/**
+  - desktop/**
+
+mac:
+  category: public.app-category.finance
+  icon: build/icon-mac.png
+  artifactName: Counterline-FX-Desk-${version}-mac.${ext}
+  target:
+    # One download for both Apple silicon and Intel Macs.
+    - target: dmg
+      arch: universal
+
+win:
+  icon: build/icon.png
+  artifactName: Counterline-FX-Desk-${version}-windows-setup.${ext}
+  target:
+    - target: nsis
+      arch: x64
