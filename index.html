@@ -83,6 +83,10 @@
             <p class="page-subtitle">Indicative reference rates, with the source and observation date in view.</p>
           </div>
           <div class="heading-actions">
+            <button class="button button-secondary" id="open-display-button" type="button" title="Open your buy and sell prices in a window for a customer-facing screen">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="10" rx="1.5"/><path d="M7 16.5h6M10 13.5v3"/></svg>
+              <span>Customer display</span>
+            </button>
             <button class="button button-secondary" id="refresh-button" type="button">
               <svg class="refresh-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16.4 8A6.6 6.6 0 0 0 4.8 5.7L3.5 7M3.5 7V3.8M3.5 7h3.3M3.6 12a6.6 6.6 0 0 0 11.6 2.3l1.3-1.3m0 0v3.2m0-3.2h-3.3" /></svg>
               <span>Refresh</span>
@@ -119,7 +123,7 @@
         <section class="board-layout">
           <div class="board-main">
               <div class="board-toolbar">
-                <div class="board-title-group"><div class="section-title-row"><h2>Currency &amp; metal pairs</h2><span class="pair-total" id="pair-total">8 pairs</span></div><p>Rates show quote units per base unit. Gold and silver are measured in troy ounces against USD.</p></div>
+                <div class="board-title-group"><div class="section-title-row"><h2>Currency &amp; metal pairs</h2><span class="pair-total" id="pair-total">8 pairs</span><button class="review-chip" id="review-chip" type="button" hidden></button></div><p>Rates show quote units per base unit. Gold and silver are measured in troy ounces against USD.</p></div>
                 <div class="toolbar-tools">
                   <label class="search-field">
                     <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.6"/><path d="m13 13 4 4"/></svg>
@@ -127,6 +131,8 @@
                     <input id="search-input" type="search" placeholder="Find a currency" autocomplete="off" />
                     <kbd>/</kbd>
                   </label>
+                  <button class="button button-secondary" id="copy-rate-sheet" type="button" title="Copy your buy and sell prices as text, ready to paste into a message">Copy rate sheet</button>
+                  <button class="button button-secondary" id="download-rate-sheet" type="button" title="Download your prices, with the reference rates, as a CSV file">CSV</button>
                   <button class="button button-secondary options-toggle" id="display-options-toggle" type="button" aria-expanded="false" aria-controls="display-options">
                     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/><circle cx="7" cy="5" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="8" cy="15" r="2"/></svg>
                     View options
@@ -146,6 +152,7 @@
                       <option value="needs-prices">Prices to complete</option>
                       <option value="priced">Ready to quote</option>
                       <option value="reference-issues">Stale or missing reference</option>
+                      <option value="review">Prices to review</option>
                     </select>
                   </label>
                   <label>SORT BY
@@ -244,8 +251,18 @@
             <div class="history-heading">
               <div class="card-kicker">RATE MOVEMENT</div>
               <h2 id="history-title">Currency pair history</h2>
-              <p>Drag a card to reorder it; the order is saved in this browser. A chart is labelled when it is an estimate.</p>
+              <p>Drag a card to reorder it, or sort the cards by name or price. A chart is labelled when it is an estimate.</p>
             </div>
+            <div class="history-tools">
+              <label class="card-sort"><span>SORT</span>
+                <select id="pair-card-sort" aria-label="Sort currency charts">
+                  <option value="custom">Custom order</option>
+                  <option value="name-asc">Name A → Z</option>
+                  <option value="name-desc">Name Z → A</option>
+                  <option value="price-asc">Price low → high</option>
+                  <option value="price-desc">Price high → low</option>
+                </select>
+              </label>
             <div class="history-controls" role="group" aria-label="Chart time range" aria-describedby="history-resolution-note">
               <button class="history-range" type="button" data-history-range="5min" aria-pressed="false">5 min</button>
               <button class="history-range" type="button" data-history-range="24h" aria-pressed="false">24 hours</button>
@@ -254,8 +271,9 @@
               <button class="history-range" type="button" data-history-range="3m" aria-pressed="false">3 months</button>
               <button class="history-range" type="button" data-history-range="6m" aria-pressed="false">6 months</button>
             </div>
+            </div>
           </header>
-          <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span><span>Daily history is Frankfurter's reference data. The 5-minute and 24-hour views use <a href="https://twelvedata.com/" target="_blank" rel="noreferrer">Twelve Data</a> when it is configured. Otherwise, and whenever its rate limit is reached, they show an interpolated estimate that ends on the latest Frankfurter reference rate. An estimate is always labelled; it is not observed market history.</span></p>
+          <p class="history-resolution-note" id="history-resolution-note"><span aria-hidden="true">ⓘ</span><span>Daily history is <a href="https://frankfurter.dev/" target="_blank" rel="noreferrer">Frankfurter</a>'s central-bank reference data. No free source publishes intraday rates for commercial use, so the 5-minute and 24-hour views are interpolated estimates that end on the latest reference rate. An estimate is always labelled; it is not observed market history.</span></p>
           <div class="history-status" id="history-status" role="status" aria-live="polite">Loading daily history…</div>
           <div class="history-grid" id="history-grid" role="list" aria-label="Currency pair history charts"></div>
         </section>
@@ -267,9 +285,20 @@
               <h2 id="markets-title">Markets beyond currencies</h2>
               <p>Indicative benchmarks with the unit, source and observation time kept in view.</p>
             </div>
-            <div class="markets-update" id="markets-status" role="status" aria-live="polite">
-              <span class="market-live-dot" aria-hidden="true"></span>
-              <span>Loading gold and silver…</span>
+            <div class="markets-tools">
+              <label class="card-sort"><span>SORT</span>
+                <select id="quote-card-sort" aria-label="Sort market cards">
+                  <option value="custom">Default order</option>
+                  <option value="name-asc">Name A → Z</option>
+                  <option value="name-desc">Name Z → A</option>
+                  <option value="price-asc">Price low → high</option>
+                  <option value="price-desc">Price high → low</option>
+                </select>
+              </label>
+              <div class="markets-update" id="markets-status" role="status" aria-live="polite">
+                <span class="market-live-dot" aria-hidden="true"></span>
+                <span>Loading market prices…</span>
+              </div>
             </div>
           </header>
 
@@ -288,36 +317,46 @@
               <div class="market-unit">USD <span>·</span> per troy ounce</div>
               <div class="market-card-bottom"><span class="market-change market-change-pending">Reference price</span><span class="market-observation">Loading…</span></div>
             </article>
-            <article class="market-card market-card-oil" role="listitem">
+            <article class="market-card market-card-oil" data-market-code="WTI" role="listitem">
               <div class="market-card-top"><span class="market-symbol">WTI</span><span class="market-kind">ENERGY</span></div>
               <div class="market-card-name"><h3>Crude oil</h3><span>WTI spot</span></div>
-              <div class="market-value market-value-unavailable">Source needed</div>
+              <div class="market-value market-value-unavailable" data-market-value>Loading…</div>
               <div class="market-unit">USD <span>·</span> per barrel</div>
-              <div class="market-card-bottom"><span class="market-change market-change-pending">Feed required</span><span class="market-observation">No source selected</span></div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Daily spot price</span><span class="market-observation">Loading…</span></div>
             </article>
-            <article class="market-card market-card-brent" role="listitem">
+            <article class="market-card market-card-brent" data-market-code="BRENT" role="listitem">
               <div class="market-card-top"><span class="market-symbol">BRENT</span><span class="market-kind">ENERGY</span></div>
               <div class="market-card-name"><h3>Brent crude</h3><span>North Sea</span></div>
-              <div class="market-value market-value-unavailable">Source needed</div>
+              <div class="market-value market-value-unavailable" data-market-value>Loading…</div>
               <div class="market-unit">USD <span>·</span> per barrel</div>
-              <div class="market-card-bottom"><span class="market-change market-change-pending">Feed required</span><span class="market-observation">No source selected</span></div>
+              <div class="market-card-bottom"><span class="market-change market-change-pending">Daily spot price</span><span class="market-observation">Loading…</span></div>
             </article>
           </div>
 
           <footer class="markets-footnote">
             <span class="markets-footnote-mark" aria-hidden="true">i</span>
-            <p>Reference-market values are not counter offers. Gold and silver show <a href="https://frankfurter.dev/" target="_blank" rel="noreferrer">Frankfurter</a>'s daily reference price, or the latest <a href="https://twelvedata.com/" target="_blank" rel="noreferrer">Twelve Data</a> price when that source is configured. Oil needs a separate source.</p>
+            <p>Reference-market values are not counter offers. Gold and silver are <a href="https://frankfurter.dev/" target="_blank" rel="noreferrer">Frankfurter</a>'s daily central-bank reference prices. Crude oil prices are daily spot prices from the <a href="https://www.eia.gov/dnav/pet/pet_pri_spt_s1_d.htm" target="_blank" rel="noreferrer">U.S. Energy Information Administration</a>, which publishes them about a week in arrears. Each card shows the date its price was observed.</p>
           </footer>
         </section>
 
         <section class="history-section market-history-section" id="market-history" aria-labelledby="market-history-title">
           <header class="history-header">
             <div class="history-heading">
-              <div class="card-kicker">PRECIOUS METAL MOVEMENT</div>
-              <h2 id="market-history-title">Gold &amp; silver price history</h2>
-              <p>Drag a card to reorder it. Reference prices in USD per troy ounce.</p>
+              <div class="card-kicker">METALS <span>·</span> ENERGY MOVEMENT</div>
+              <h2 id="market-history-title">Metals &amp; oil price history</h2>
+              <p>Drag a card to reorder it, or sort the cards. Gold and silver in USD per troy ounce, crude oil in USD per barrel.</p>
             </div>
-            <div class="history-controls market-history-controls" role="group" aria-label="Metal chart time range" aria-describedby="market-history-resolution-note">
+            <div class="history-tools">
+              <label class="card-sort"><span>SORT</span>
+                <select id="market-card-sort" aria-label="Sort metal and oil charts">
+                  <option value="custom">Custom order</option>
+                  <option value="name-asc">Name A → Z</option>
+                  <option value="name-desc">Name Z → A</option>
+                  <option value="price-asc">Price low → high</option>
+                  <option value="price-desc">Price high → low</option>
+                </select>
+              </label>
+            <div class="history-controls market-history-controls" role="group" aria-label="Metal and oil chart time range" aria-describedby="market-history-resolution-note">
               <button class="history-range" type="button" data-market-history-range="5min" aria-pressed="false">5 min</button>
               <button class="history-range" type="button" data-market-history-range="24h" aria-pressed="false">24 hours</button>
               <button class="history-range" type="button" data-market-history-range="1w" aria-pressed="false">1 week</button>
@@ -325,10 +364,11 @@
               <button class="history-range" type="button" data-market-history-range="3m" aria-pressed="false">3 months</button>
               <button class="history-range" type="button" data-market-history-range="6m" aria-pressed="false">6 months</button>
             </div>
+            </div>
           </header>
-          <p class="history-resolution-note" id="market-history-resolution-note"><span aria-hidden="true">ⓘ</span><span>Gold and silver use Twelve Data when it is configured. Without it, the daily views show Frankfurter's reference history, and the 5-minute and 24-hour views show a labelled estimate that ends on the latest Frankfurter reference price. An estimate is not observed market history.</span></p>
-          <div class="history-status" id="market-history-status" role="status" aria-live="polite">Loading metal price history…</div>
-          <div class="history-grid market-history-grid" id="market-history-grid" role="list" aria-label="Gold and silver history charts"></div>
+          <p class="history-resolution-note" id="market-history-resolution-note"><span aria-hidden="true">ⓘ</span><span>Daily history: gold and silver from Frankfurter, crude oil from the U.S. Energy Information Administration. For gold and silver the 5-minute and 24-hour views are labelled estimates that end on the latest reference price. Oil has daily prices only, so it has no intraday view.</span></p>
+          <div class="history-status" id="market-history-status" role="status" aria-live="polite">Loading metal and oil price history…</div>
+          <div class="history-grid market-history-grid" id="market-history-grid" role="list" aria-label="Gold, silver and crude oil history charts"></div>
         </section>
 
         <footer class="page-footer"><span>COUNTERLINE <span class="footer-divider">/</span> FX DESK</span><span>Reference data for operational context only.</span></footer>
@@ -359,6 +399,12 @@
           <label class="price-field buy-field"><span><strong>We buy base</strong><small>Customer sells base</small></span><div class="price-input"><span class="price-quote-code"></span><input name="buy" id="price-buy" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 0.9200" maxlength="24" /></div></label>
           <label class="price-field sell-field"><span><strong>We sell base</strong><small>Customer buys base</small></span><div class="price-input"><span class="price-quote-code"></span><input name="sell" id="price-sell" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 0.9400" maxlength="24" /></div></label>
         </div>
+        <div class="margin-helper">
+          <label for="price-margin">Margin from the reference</label>
+          <div class="margin-input"><input id="price-margin" type="text" inputmode="decimal" autocomplete="off" maxlength="5" aria-describedby="margin-preview" /><span>%</span></div>
+          <button class="button button-secondary" type="button" id="apply-margin">Fill both prices</button>
+        </div>
+        <p class="margin-preview" id="margin-preview" aria-live="polite"></p>
         <p class="validation-message" id="price-validation" role="alert" hidden></p>
         <div class="dialog-footnote">Rates are saved exactly as entered. The calculator rounds the resulting payout to the quote currency’s minor unit. No fees or additional rounding rules are applied.</div>
         <div class="dialog-actions"><button class="button button-danger-quiet" type="button" id="clear-price-button">Clear prices</button><span class="dialog-action-spacer"></span><button class="button button-secondary" type="button" data-close-dialog>Cancel</button><button class="button button-primary" type="submit">Save prices</button></div>
