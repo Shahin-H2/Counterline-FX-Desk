@@ -1110,3 +1110,102 @@ body[data-theme="night"] .status-tag { color: #c4e7a6; background: rgb(150 204 1
 body[data-theme="night"] .status-tag[data-state="stale"], body[data-theme="night"] .status-tag[data-state="partial"],
 body[data-theme="night"] .status-tag[data-state="cached"] { color: #f0cf8c; background: rgb(232 184 96 / 15%); }
 body[data-theme="night"] .status-tag[data-state="error"] { color: #f2b5aa; background: rgb(224 124 110 / 16%); }
+
+/* ==========================================================================
+                              Card sorting
+   The sort control beside each range switch, and the same control for the
+   market cards. Sorted cards slide to their places (src/ui/card-reorder.js).
+   ========================================================================== */
+.history-tools, .markets-tools { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 9px; }
+.card-sort { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 0 5px 0 11px; border: 1px solid var(--line); border-radius: 6px; color: #7b8c82; background: rgb(245 248 244 / 80%); font: 500 10px "DM Mono", monospace; letter-spacing: .7px; }
+.card-sort select { height: 32px; padding: 0 6px; border: 1px solid transparent; border-radius: 4px; color: #244e3d; background: transparent; font: 600 12px "DM Sans", sans-serif; cursor: pointer; transition: border-color .18s ease, background .18s ease; }
+.card-sort select:hover { border-color: #dce7db; background: rgb(255 255 255 / 85%); }
+.card-sort select:focus-visible { outline: 2px solid #83a75e; outline-offset: 1px; }
+/* The market cards take part in sorting, so their entrance must hand transform back when it ends. */
+.market-card { animation-fill-mode: backwards; }
+body[data-theme="night"] .card-sort { border-color: #35493e; color: #9db0a5; background: rgb(20 32 28 / 80%); }
+body[data-theme="night"] .card-sort select { color: #e4efdc; }
+body[data-theme="night"] .card-sort select:hover { border-color: #405849; background: rgb(42 62 50 / 85%); }
+@media (max-width: 620px) {
+  .history-tools, .markets-tools { width: 100%; justify-content: flex-start; }
+  .card-sort { min-height: 38px; }
+}
+
+/* ==========================================================================
+                              Desk tools
+   Margins beside each desk price, rows that need a look, and the helper in
+   the price dialog that fills both prices from a margin.
+   ========================================================================== */
+.toolbar-tools { flex-wrap: wrap; justify-content: flex-end; }
+.price-stack { display: inline-grid; gap: 2px; }
+.margin-badge { width: fit-content; padding: 1px 5px; border-radius: 3px; color: #4f7d4a; background: #edf5e8; font: 500 10px/1.5 "DM Mono", monospace; letter-spacing: .1px; }
+.margin-badge.is-negative { color: #a04b41; background: #f9e9e6; font-weight: 600; }
+.reference-moved { width: fit-content; padding: 1px 5px; border-radius: 3px; color: #8a5f14; background: #fcf1d8; font: 500 10px/1.5 "DM Sans", sans-serif !important; }
+.rates-table tbody tr.needs-review > td:first-child { box-shadow: inset 3px 0 #d39a3a; }
+.review-chip { padding: 3px 8px; border: 1px solid #ecd49a; border-radius: 999px; color: #8a5f14; background: #fdf4dc; font: 600 11px "DM Sans", sans-serif; transition: transform .18s ease, background .18s ease; }
+.review-chip:hover { transform: translateY(-1px); background: #faeac2; }
+.review-chip:focus-visible { outline: 3px solid rgb(211 154 58 / 35%); outline-offset: 2px; }
+.margin-helper { display: flex; align-items: center; gap: 9px; margin-top: 12px; padding: 9px 10px; border: 1px dashed #d5e0d2; border-radius: 6px; color: #5f7268; background: #f8faf6; font-size: 12px; }
+.margin-helper label { flex: 1; font-weight: 600; }
+.margin-input { display: flex; align-items: center; width: 82px; height: 32px; overflow: hidden; border: 1px solid #e3e9e0; border-radius: 4px; background: #fff; }
+.margin-input input { width: 100%; height: 100%; min-width: 0; border: 0; outline: 0; padding: 0 7px; color: #253d34; background: transparent; font: 500 13px "DM Mono", monospace; text-align: right; }
+.margin-input span { padding: 0 8px 0 2px; color: #7d8b83; font: 500 12px "DM Mono", monospace; }
+.margin-input:focus-within { border-color: #bfcca9; box-shadow: 0 0 0 3px rgb(152 184 96 / 10%); }
+.margin-helper .button { min-height: 32px; white-space: nowrap; }
+.margin-preview { min-height: 17px; margin: 7px 0 0; color: #5d7a60; font: 500 11px "DM Mono", monospace; }
+.margin-preview[data-state="warning"] { color: #a04b41; }
+body[data-theme="night"] .margin-badge { color: #c4e7a6; background: rgb(150 204 120 / 15%); }
+body[data-theme="night"] .margin-badge.is-negative { color: #f2b5aa; background: rgb(224 124 110 / 18%); }
+body[data-theme="night"] .reference-moved { color: #f0cf8c; background: rgb(232 184 96 / 15%); }
+body[data-theme="night"] .rates-table tbody tr.needs-review > td:first-child { box-shadow: inset 3px 0 #e1b65e; }
+body[data-theme="night"] .review-chip { border-color: #66522b; color: #f0d393; background: #302a1c; }
+body[data-theme="night"] .review-chip:hover { background: #3b3320; }
+body[data-theme="night"] .margin-helper { border-color: #3a5046; color: #a8bcae; background: #1b2a25; }
+body[data-theme="night"] .margin-input { border-color: #3b5147; background: #12201c; }
+body[data-theme="night"] .margin-input input { color: #e1ece4; }
+body[data-theme="night"] .margin-preview { color: #b5d3a4; }
+body[data-theme="night"] .margin-preview[data-state="warning"] { color: #f2b5aa; }
+@media (max-width: 620px) {
+  .margin-helper { flex-wrap: wrap; }
+}
+
+/* ==========================================================================
+                              Customer display
+   display.html: the desk's buy and sell prices, large, for a screen that
+   faces customers. Type scales with the window.
+   ========================================================================== */
+.display-page { min-height: 100vh; }
+.display { position: relative; z-index: 1; display: flex; min-height: 100vh; flex-direction: column; gap: clamp(14px, 2.2vw, 30px); padding: clamp(16px, 3vw, 44px); }
+.display-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.display-header .brand { margin: 0; color: var(--ink); }
+.display-header .brand-copy strong { font-size: clamp(20px, 2.4vw, 34px); }
+.display-header .brand-copy small { color: var(--muted); font-size: clamp(10px, 1vw, 13px); }
+.display-header .brand-mark { grid-template-columns: repeat(2, clamp(9px, 1.1vw, 14px)); grid-template-rows: repeat(2, clamp(9px, 1.1vw, 14px)); gap: 4px; }
+.display-clock { display: grid; justify-items: end; gap: 2px; color: var(--muted); font: 400 clamp(11px, 1.1vw, 15px) "DM Mono", monospace; }
+.display-clock strong { color: var(--ink); font: 700 clamp(24px, 3vw, 44px)/1 "Manrope", sans-serif; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.display-board { display: grid; flex: 1; align-content: start; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: clamp(10px, 1.4vw, 20px); }
+.display-row { container-type: inline-size; display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: clamp(8px, 1.2vw, 16px) clamp(12px, 1.6vw, 24px); padding: clamp(14px, 1.8vw, 26px) clamp(16px, 2vw, 28px); border: 1px solid var(--line); border-radius: 14px; background: rgb(255 255 255 / 74%); box-shadow: 0 15px 36px rgb(37 74 56 / 7%); backdrop-filter: blur(14px) saturate(118%); animation: enter-up .4s ease-out backwards; }
+.display-pair { display: grid; grid-column: 1 / -1; min-width: 0; gap: 3px; padding-bottom: clamp(6px, 1cqw, 12px); border-bottom: 1px solid var(--line); }
+.display-pair strong { color: var(--ink); font: 800 clamp(20px, 8cqw, 46px)/1.1 "Manrope", sans-serif; letter-spacing: -.02em; white-space: nowrap; }
+.display-pair strong span { color: var(--lime-dark); }
+.display-pair small { overflow: hidden; color: var(--muted); font-size: clamp(11px, 3.4cqw, 17px); text-overflow: ellipsis; white-space: nowrap; }
+.display-price { display: grid; min-width: 0; gap: 2px; }
+.display-price span { color: var(--muted); font: 500 clamp(10px, 2.9cqw, 14px) "DM Mono", monospace; letter-spacing: .1em; }
+.display-price strong { color: #254c3d; font: 700 clamp(22px, 11cqw, 66px)/1.05 "Manrope", sans-serif; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.display-price.is-long strong { font-size: clamp(18px, 8.4cqw, 50px); }
+.display-price.is-longer strong { font-size: clamp(15px, 6.4cqw, 38px); }
+.display-sell strong { color: #735b33; }
+.display-price small { color: var(--muted); font: 400 clamp(10px, 2.7cqw, 13px) "DM Mono", monospace; white-space: nowrap; }
+.display-empty { display: grid; grid-column: 1 / -1; justify-items: center; gap: 8px; align-self: center; padding: 12vh 20px; color: var(--muted); text-align: center; }
+.display-empty strong { color: var(--ink); font: 700 clamp(22px, 2.6vw, 36px) "Manrope", sans-serif; }
+.display-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; color: var(--muted); font-size: clamp(11px, .95vw, 13px); }
+.display-footer > span:first-child { color: var(--ink-soft); font-weight: 600; }
+.display-footer .button { margin-left: auto; }
+:fullscreen .display-footer .button { display: none; }
+body[data-theme="night"] .display-row { border-color: rgb(132 176 164 / 17%); background: rgb(19 30 32 / 64%); box-shadow: 0 16px 36px rgb(0 0 0 / 19%); }
+body[data-theme="night"] .display-pair { border-color: rgb(132 176 164 / 17%); }
+body[data-theme="night"] .display-price strong { color: #c1e0c2; }
+body[data-theme="night"] .display-sell strong { color: #ebd39d; }
+@media (min-width: 1250px) {
+  .markets-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
