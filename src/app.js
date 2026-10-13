@@ -7,8 +7,11 @@ import {
   multiplyAndRound,
   parseDecimal,
 } from "./domain/decimal.js";
+import { CARD_SORTS, sortCards } from "./domain/card-sort.js";
 import { isObservationStale } from "./domain/freshness.js";
-import { createCardReorder } from "./ui/card-reorder.js";
+import { deskMargins, pricesFromMargin, reviewDeskPrice } from "./domain/margin.js";
+import { rateSheetCsv, rateSheetRows, rateSheetText } from "./domain/rate-sheet.js";
+import { createCardReorder, slide } from "./ui/card-reorder.js";
 import { createChartProbe } from "./ui/chart-probe.js";
 import { createCosmos } from "./ui/cosmos.js";
 
@@ -24,6 +27,10 @@ const DEFAULT_VIEW = {
   sort: "board",
   density: "comfortable",
   theme: "evergreen",
+  pairCardSort: "custom",
+  marketCardSort: "custom",
+  quoteCardSort: "custom",
+  marginPercent: "1.5",
 };
 const DEFAULT_PAIRS = [
   "USD/EUR",
@@ -42,6 +49,7 @@ const METAL_ASSETS = [
 const METAL_CODES = new Set(METAL_ASSETS.map(({ code }) => code));
 const MAX_BOARD_PAIRS = 30;
 const MANUAL_RATE_PATTERN = /^\d+(?:\.\d{1,8})?$/;
+const MARGIN_PATTERN = /^\d{1,2}(?:\.\d{1,2})?$/;
 const locale = navigator.language || "en-US";
 
 // DOM elements
@@ -100,6 +108,17 @@ const elements = {
   marketHistoryStatus: document.querySelector("#market-history-status"),
   marketHistoryRanges: document.querySelector(".market-history-controls"),
   marketStatus: document.querySelector("#markets-status"),
+  marketsGrid: document.querySelector("#markets-grid"),
+  pairCardSort: document.querySelector("#pair-card-sort"),
+  marketCardSort: document.querySelector("#market-card-sort"),
+  quoteCardSort: document.querySelector("#quote-card-sort"),
+  reviewChip: document.querySelector("#review-chip"),
+  copyRateSheet: document.querySelector("#copy-rate-sheet"),
+  downloadRateSheet: document.querySelector("#download-rate-sheet"),
+  openDisplay: document.querySelector("#open-display-button"),
+  priceMargin: document.querySelector("#price-margin"),
+  applyMargin: document.querySelector("#apply-margin"),
+  marginPreview: document.querySelector("#margin-preview"),
   announcements: document.querySelector("#announcements"), // the live region for announcing changes to screen readers
 };
 
@@ -155,7 +174,12 @@ function loadSettings() {
             isPositiveDecimal(sell, { maxScale: 8 }))) &&
         (buy || sell)
       )
-        prices[id] = { buy, sell };
+        prices[id] = {
+          buy,
+          sell,
+          setAt: Number.isNaN(Date.parse(value.setAt)) ? null : String(value.setAt),
+          referenceAtSet: isPositiveDecimal(String(value.referenceAtSet ?? "")) ? String(value.referenceAtSet) : null,
+        };
     }
   }
   return { pairs, prices };
@@ -165,7 +189,7 @@ function loadSettings() {
 const settings = loadSettings();
 const savedView = readJson(VIEW_STORAGE_KEY, {}) ?? {};
 const view = {
-  filter: ["all", "needs-prices", "priced", "reference-issues"].includes(
+  filter: ["all", "needs-prices", "priced", "reference-issues", "review"].includes(
     savedView.filter,
   )
     ? savedView.filter
@@ -181,6 +205,12 @@ const view = {
   theme: ["evergreen", "night"].includes(savedView.theme)
     ? savedView.theme
     : DEFAULT_VIEW.theme,
+  // How the chart cards and the market cards are ordered: as arranged by hand, or sorted.
+  pairCardSort: CARD_SORTS.includes(savedView.pairCardSort) ? savedView.pairCardSort : DEFAULT_VIEW.pairCardSort,
+  marketCardSort: CARD_SORTS.includes(savedView.marketCardSort) ? savedView.marketCardSort : DEFAULT_VIEW.marketCardSort,
+  quoteCardSort: CARD_SORTS.includes(savedView.quoteCardSort) ? savedView.quoteCardSort : DEFAULT_VIEW.quoteCardSort,
+  // The margin last used to fill desk prices from the reference, in percent.
+  marginPercent: MARGIN_PATTERN.test(String(savedView.marginPercent)) ? String(savedView.marginPercent) : DEFAULT_VIEW.marginPercent,
 }; // The view settings control how the board is displayed, including filtering, sorting, density, and theme.
 let referenceRates = {};
 let referenceMeta = {
@@ -195,21 +225,18 @@ let hasAnimatedRows = false;
 const calculatorLookupState = new Map();
 let previousCalculatorSelection = { base: "USD", quote: "EUR" };
 // Each chart grid keeps the range on show, the series the server returned for it, and what the
-// server said about every series: observed, reference, stale or estimated.
+// server said about every series: reference, stale or estimated.
 const newChartState = () => ({
   range: "1m",
   data: {},
   series: {},
   loading: false,
   requestId: 0,
-  retries: 0,
-  retryTimer: 0,
-  retryWhenVisible: null,
   renderPending: false,
   reorder: null,
 });
 const pairCharts = newChartState();
-const metalCharts = newChartState();
+const marketCharts = newChartState();
 const INTRADAY_HISTORY_RANGES = new Set(["5min", "24h"]);
 const HISTORY_RANGE_LABELS = {
   "5min": "5 minutes",
@@ -219,18 +246,26 @@ const HISTORY_RANGE_LABELS = {
   "3m": "3 months",
   "6m": "6 months",
 };
-const SERIES_KINDS = new Set(["observed", "reference", "stale", "estimated"]);
-const MAX_HISTORY_RETRIES = 3;
+const SERIES_KINDS = new Set(["reference", "stale", "estimated"]);
+// How each data source is named in a status line and on a quote card.
+const SOURCE_NAMES = {
+  Frankfurter: { history: "from Frankfurter's daily reference history", quote: "Frankfurter daily reference" },
+  EIA: { history: "of EIA daily spot prices", quote: "EIA daily spot price" },
+};
 const renderedCardMarkup = new WeakMap(); // card element -> the markup last written into it
 const chartGeometry = new WeakMap(); // card element -> its chart's points, for the hover read-out
 const cosmos = createCosmos({
   backdrop: document.querySelector(".cosmos"),
   sidebar: document.querySelector(".sidebar"),
 });
+// The charts of the markets section, each priced in US dollars.
 const MARKET_HISTORY_ASSETS = [
   { code: "XAU", name: "Gold", detail: "USD per troy ounce" },
   { code: "XAG", name: "Silver", detail: "USD per troy ounce" },
+  { code: "WTI", name: "Crude oil (WTI)", detail: "USD per barrel" },
+  { code: "BRENT", name: "Brent crude", detail: "USD per barrel" },
 ];
+let marketQuotes = {}; // asset code -> the quote shown on its card
 let pairHistoryOrder = reconcileChartOrder(readJson(PAIR_HISTORY_ORDER_KEY, []), settings.pairs);
 let marketHistoryOrder = reconcileChartOrder(readJson(METAL_HISTORY_ORDER_KEY, []), MARKET_HISTORY_ASSETS.map(({ code }) => code));
 
@@ -415,7 +450,7 @@ function historyCardView(id, observations, series, cardIndex, { market = false, 
     };
   }
 
-  const kind = SERIES_KINDS.has(series?.kind) ? series.kind : "observed";
+  const kind = SERIES_KINDS.has(series?.kind) ? series.kind : "reference";
   const estimated = kind === "estimated";
   const stale = kind === "stale";
   // Calculate the dimensions and coordinates for the chart, including the min/max values, padding, and scaling for the SVG elements.
@@ -462,7 +497,7 @@ function historyCardView(id, observations, series, cardIndex, { market = false, 
   const latest = points.at(-1);
   const subject = market ? `${asset?.name ?? id} USD reference price` : `${base} to ${quote} reference rate`;
   const ariaLabel = `${estimated ? "Illustrative interpolated estimate of " : stale ? "Last observed " : ""}${subject} from ${formatHistoryTooltip(points[0].date)} to ${formatHistoryTooltip(latest.date)}${series?.source ? `. Source: ${series.source}` : ""}`;
-  const latestValue = market ? formatUsdMetalPrice(latest.rate) : formatPairRate(latest.rate);
+  const latestValue = market ? formatUsdPrice(latest.rate) : formatPairRate(latest.rate);
   const latestPrefix = market ? "USD price" : `1 ${escapeHtml(base)} <span aria-hidden="true">=</span>`;
   // An estimate ends on the reference price it is anchored to, so the headline names that reference.
   const latestMeta = estimated
@@ -509,6 +544,12 @@ function renderHistoryCards(grid, ids, viewFor) {
     [...grid.querySelectorAll(":scope > [data-history-card-id]")].map((card) => [card.dataset.historyCardId, card]),
   );
   grid.querySelectorAll(":scope > :not([data-history-card-id])").forEach((node) => node.remove());
+  // When the cards that stay change places, for example after sorting, they slide there.
+  const staying = ids.filter((id) => existing.has(id));
+  const reordered = [...existing.keys()].filter((id) => staying.includes(id)).some((id, index) => id !== staying[index]);
+  if (reordered) {
+    slide([...existing.values()], () => staying.forEach((id) => grid.append(existing.get(id))));
+  }
   let previous = null;
   ids.forEach((id, index) => {
     const view = viewFor(id, index);
@@ -557,7 +598,12 @@ function renderChartGrid(charts, grid, order, market) {
   );
 }
 
-// Render the currency pair chart grid in the saved card order.
+// The price a card is sorted by: its reference price, or failing that the last point of its chart.
+function cardPrice(reference, chart) {
+  return Number(reference?.rate) || Number(chart?.at(-1)?.rate) || Number.NaN;
+}
+
+// Render the currency pair chart grid: in the order arranged by hand, or sorted by name or price.
 function renderPairHistory() {
   if (!elements.historyGrid) return;
   pairHistoryOrder = reconcileChartOrder(pairHistoryOrder, settings.pairs);
@@ -567,38 +613,60 @@ function renderPairHistory() {
       '<div class="history-board-empty" role="listitem"><strong>No currency pairs yet</strong><span>Add a pair to see its rate history here.</span></div>';
     return;
   }
-  renderChartGrid(pairCharts, elements.historyGrid, pairHistoryOrder, false);
+  const cards = pairHistoryOrder.map((id) => ({ id, name: id.replace("/", " "), price: cardPrice(referenceRates[id], pairCharts.data[id]) }));
+  renderChartGrid(pairCharts, elements.historyGrid, sortCards(cards, view.pairCardSort, locale), false);
 }
 
 function renderMarketHistory() {
   if (!elements.marketHistoryGrid) return;
   marketHistoryOrder = reconcileChartOrder(marketHistoryOrder, MARKET_HISTORY_ASSETS.map(({ code }) => code));
-  renderChartGrid(metalCharts, elements.marketHistoryGrid, marketHistoryOrder, true);
+  const cards = marketHistoryOrder.map((code) => ({
+    id: code,
+    name: MARKET_HISTORY_ASSETS.find((asset) => asset.code === code).name,
+    price: cardPrice(marketQuotes[code], marketCharts.data[code]),
+  }));
+  renderChartGrid(marketCharts, elements.marketHistoryGrid, sortCards(cards, view.marketCardSort, locale), true);
+}
+
+// Puts the quote cards of the markets section in their default order, or sorted by name or price.
+function renderMarketCardOrder() {
+  const cards = [...elements.marketsGrid.querySelectorAll("[data-market-code]")];
+  const byCode = new Map(cards.map((card) => [card.dataset.marketCode, card]));
+  const listed = MARKET_HISTORY_ASSETS.filter(({ code }) => byCode.has(code)).map(({ code }) => ({
+    id: code,
+    name: byCode.get(code).querySelector("h3").textContent,
+    price: Number(marketQuotes[code]?.rate),
+  }));
+  const order = sortCards(listed, view.quoteCardSort, locale);
+  if (order.every((code, index) => cards[index]?.dataset.marketCode === code)) return;
+  slide(cards, () => order.forEach((code) => elements.marketsGrid.append(byCode.get(code))));
 }
 
 // One line saying what the charts in a grid are made of, and why when it is not observed data.
-function describeHistory(ids, series, range, retryDelay) {
-  const counts = { observed: 0, reference: 0, stale: 0, estimated: 0, unavailable: 0 };
-  for (const id of ids) counts[SERIES_KINDS.has(series[id]?.kind) ? series[id].kind : "unavailable"] += 1;
-  const parts = [];
-  if (counts.observed) parts.push(`${counts.observed} series from Twelve Data`);
-  if (counts.reference) parts.push(`${counts.reference} series from Frankfurter's daily reference history`);
-  if (counts.stale) parts.push(`${counts.stale} series last observed earlier`);
-  if (counts.estimated) parts.push(`${counts.estimated} interpolated estimate${counts.estimated === 1 ? "" : "s"}, not observed market history`);
-  if (counts.unavailable) parts.push(`${counts.unavailable} unavailable`);
-  const reason = ids.map((id) => series[id]).find((item) => item?.kind !== "observed" && item?.message)?.message;
-  const retry = retryDelay ? ` Checking again in ${Math.max(1, Math.round(retryDelay / 1000))} s.` : "";
-  return `${HISTORY_RANGE_LABELS[range]} · ${parts.join(" · ")}${reason ? ` · ${reason}${retry}` : ""}`;
+function describeHistory(ids, series, range) {
+  const observed = new Map(); // source -> number of series it supplied
+  let stale = 0;
+  let estimated = 0;
+  let unavailable = 0;
+  for (const id of ids) {
+    const item = series[id];
+    if (item?.kind === "reference") observed.set(item.source, (observed.get(item.source) ?? 0) + 1);
+    else if (item?.kind === "stale") stale += 1;
+    else if (item?.kind === "estimated") estimated += 1;
+    else unavailable += 1;
+  }
+  const parts = [...observed].map(([source, count]) => `${count} series ${SOURCE_NAMES[source]?.history ?? `from ${source}`}`);
+  if (stale) parts.push(`${stale} series last observed earlier`);
+  if (estimated) parts.push(`${estimated} interpolated estimate${estimated === 1 ? "" : "s"}, not observed market history`);
+  if (unavailable) parts.push(`${unavailable} unavailable`);
+  const reason = ids.map((id) => series[id]).find((item) => item?.kind !== "reference" && item?.message)?.message;
+  return `${HISTORY_RANGE_LABELS[range]} · ${parts.join(" · ")}${reason ? ` · ${reason}` : ""}`;
 }
 
-// Loads one chart grid. The server answers with a series for every id: observed data where a
-// source has it, otherwise a labelled estimate. It also says when it is worth asking again, for
-// example once a rate limit has passed.
-async function loadCharts(charts, { ids, url, statusElement, render, emptyMessage, reload }, { retry = false } = {}) {
+// Loads one chart grid. The server answers with a series for every id: observed daily data where
+// a source has it, otherwise a labelled estimate, or nothing when there is no basis for one.
+async function loadCharts(charts, { ids, url, statusElement, render, emptyMessage }) {
   const requestId = ++charts.requestId;
-  window.clearTimeout(charts.retryTimer);
-  charts.retryWhenVisible = null;
-  if (!retry) charts.retries = 0;
   if (!ids.length) {
     charts.data = {};
     charts.series = {};
@@ -610,7 +678,7 @@ async function loadCharts(charts, { ids, url, statusElement, render, emptyMessag
   const range = charts.range;
   charts.loading = true;
   render();
-  if (!retry) statusElement.textContent = `Loading ${HISTORY_RANGE_LABELS[range]} of history…`;
+  statusElement.textContent = `Loading ${HISTORY_RANGE_LABELS[range]} of history…`;
   try {
     const response = await fetch(url(ids, range), { headers: { accept: "application/json" } });
     if (!response.ok) throw new Error("History unavailable");
@@ -619,32 +687,20 @@ async function loadCharts(charts, { ids, url, statusElement, render, emptyMessag
     charts.data = body.rates && typeof body.rates === "object" ? body.rates : {};
     charts.series = body.series && typeof body.series === "object" ? body.series : {};
     charts.loading = false;
-    const retryDelay =
-      Number.isFinite(body.retryAfterMs) && body.retryAfterMs > 0 && charts.retries < MAX_HISTORY_RETRIES
-        ? body.retryAfterMs
-        : 0;
-    if (retryDelay) {
-      charts.retries += 1;
-      charts.retryTimer = window.setTimeout(() => {
-        // A hidden tab spends no provider credits; the check runs when the tab is shown again.
-        if (document.visibilityState === "visible") reload({ retry: true });
-        else charts.retryWhenVisible = () => reload({ retry: true });
-      }, retryDelay);
-    }
-    statusElement.textContent = describeHistory(ids, charts.series, range, retryDelay);
+    statusElement.textContent = describeHistory(ids, charts.series, range);
     render();
   } catch {
     if (requestId !== charts.requestId) return;
     charts.loading = false;
     statusElement.textContent = Object.keys(charts.data).length
       ? "The history service could not be reached · showing the charts loaded earlier"
-      : "The history service could not be reached. Check that the server is running, then press Refresh.";
+      : "The history service could not be reached. Press Refresh to try again.";
     render();
   }
 }
 
 // Load the history charts for the pairs on the board.
-function loadPairHistory(options) {
+function loadPairHistory() {
   return loadCharts(pairCharts, {
     ids: [...settings.pairs],
     url: (ids, range) =>
@@ -652,23 +708,21 @@ function loadPairHistory(options) {
     statusElement: elements.historyStatus,
     render: renderPairHistory,
     emptyMessage: "Add currency pairs to view their history.",
-    reload: loadPairHistory,
-  }, options);
+  });
 }
 
-function loadMarketHistory(options) {
-  return loadCharts(metalCharts, {
+function loadMarketHistory() {
+  return loadCharts(marketCharts, {
     ids: MARKET_HISTORY_ASSETS.map(({ code }) => code),
     url: (ids, range) =>
       `/api/market-history?assets=${encodeURIComponent(ids.join("|"))}&range=${encodeURIComponent(range)}`,
     statusElement: elements.marketHistoryStatus,
     render: renderMarketHistory,
     emptyMessage: "",
-    reload: loadMarketHistory,
-  }, options);
+  });
 }
 
-function formatUsdMetalPrice(value) {
+function formatUsdPrice(value) {
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "USD",
@@ -681,8 +735,8 @@ function formatSignedPercent(value) {
   return `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(2)}%`;
 }
 
-// Fills the gold and silver quote cards. Each card names its source and when the price was
-// observed; a Frankfurter daily reference also shows the move since the observation before it.
+// Fills the quote cards of the markets section. Each card names its source and the date its
+// price was observed, and shows the move since the observation before it.
 async function loadMarketQuotes() {
   const cards = [...document.querySelectorAll("[data-market-code]")];
   const statusText = elements.marketStatus.querySelector("span:last-child");
@@ -700,37 +754,35 @@ async function loadMarketQuotes() {
     const response = await fetch("/api/markets", { headers: { accept: "application/json" } });
     if (!response.ok) throw new Error("Market prices unavailable");
     const body = await response.json();
+    marketQuotes = body.rates && typeof body.rates === "object" ? body.rates : {};
     const sources = new Set();
     for (const card of cards) {
-      const quote = body.rates?.[card.dataset.marketCode];
+      const quote = marketQuotes[card.dataset.marketCode];
       if (!quote || !isPositiveDecimal(String(quote.rate))) {
-        show(card, { value: "Unavailable", available: false, change: "No reference price", observation: "Will retry automatically" });
+        show(card, { value: "Unavailable", available: false, change: "No price loaded", observation: "Press Refresh to try again" });
         continue;
       }
-      sources.add(quote.source === "Frankfurter" ? "Frankfurter daily reference" : quote.source);
+      sources.add(SOURCE_NAMES[quote.source]?.quote ?? quote.source);
       const previous = Number(quote.previous?.rate);
-      const change = quote.kind === "reference"
-        ? previous > 0
-          ? `${formatSignedPercent((Number(quote.rate) / previous - 1) * 100)} since ${dayLabel(quote.previous.date)}`
-          : "Daily reference"
-        : quote.kind === "stale" ? "Last observed" : "Latest price";
-      const observed = quote.observedAt ? formatHistoryTooltip(quote.observedAt) : dayLabel(quote.date);
-      show(card, { value: formatUsdMetalPrice(quote.rate), available: true, change, observation: `${quote.source} · ${observed}` });
+      const change = previous > 0
+        ? `${formatSignedPercent((Number(quote.rate) / previous - 1) * 100)} since ${dayLabel(quote.previous.date)}`
+        : "Daily reference";
+      // A stale quote is the last one the source delivered; its refresh failed.
+      show(card, { value: formatUsdPrice(quote.rate), available: true, change, observation: `${quote.source} · ${dayLabel(quote.date)}${quote.kind === "stale" ? " · not refreshed" : ""}` });
     }
-    const provider = body.provider?.twelveData;
-    const twelveDataOff = ["no-api-key", "display-license-unconfirmed"].includes(provider?.state);
     elements.marketStatus.dataset.state = sources.size ? "ready" : "error";
-    elements.marketStatus.title = provider?.message ?? "";
-    statusText.textContent = sources.size
-      ? `${[...sources].join(" · ")}${twelveDataOff ? " · Twelve Data off" : ""}`
-      : "Gold and silver prices are not available right now";
+    statusText.textContent = sources.size ? [...sources].join(" · ") : "Market prices are not available right now";
   } catch {
+    marketQuotes = {};
     for (const card of cards) {
-      show(card, { value: "Unavailable", available: false, change: "Feed unavailable", observation: "Will retry automatically" });
+      show(card, { value: "Unavailable", available: false, change: "Feed unavailable", observation: "Press Refresh to try again" });
     }
     elements.marketStatus.dataset.state = "error";
-    statusText.textContent = "Gold and silver prices could not be loaded";
+    statusText.textContent = "Market prices could not be loaded";
   }
+  // Prices decide the order when the cards are sorted by price.
+  renderMarketCardOrder();
+  renderMarketHistory();
 }
 
 // Determine the number of decimal places to display for a given currency code, using the Intl.NumberFormat API to get the maximum fraction digits for that currency. If the currency is a metal (gold or silver), return 8 decimal places. If the currency code is invalid or not supported, default to 2 decimal places.
@@ -885,9 +937,19 @@ function updateFeedStatus() {
 }
 
 // Render the price text for a given price and quote currency, returning a span element with the formatted price or a placeholder if the price is not available.
-function priceText(price, quote, className = "") {
+// `margin` is the desk's margin against the reference in percent; a negative one means the price
+// sits on the losing side of the reference, which `warning` spells out.
+function priceText(price, quote, className = "", margin = null, warning = "") {
   if (!price) return `<span class="price-readout ${className}">—</span>`;
-  return `<span class="price-readout ${className}">${escapeHtml(formatPairRate(price))} <small>${escapeHtml(quote)}</small></span>`;
+  const badge = margin === null
+    ? ""
+    : `<small class="margin-badge${margin < 0 ? " is-negative" : ""}" title="${escapeHtml(margin < 0 ? warning : "Margin against the reference rate")}">${escapeHtml(formatSignedPercent(margin))}${margin < 0 ? " !" : ""}</small>`;
+  return `<span class="price-stack"><span class="price-readout ${className}">${escapeHtml(formatPairRate(price))} <small>${escapeHtml(quote)}</small></span>${badge}</span>`;
+}
+
+// How a pair's desk prices sit against its reference rate, and whether they need a look.
+function reviewFor(id) {
+  return reviewDeskPrice({ reference: referenceRates[id]?.rate, ...(settings.prices[id] ?? {}) });
 }
 
 // Render the main table of currency pairs, including their reference rates, customer prices, and any relevant status indicators. This function handles filtering, sorting, and displaying the appropriate messages when no pairs match the current search or filter criteria.
@@ -897,6 +959,10 @@ function renderTable({
   highlightPair = null,
 } = {}) {
   elements.pairTotal.textContent = `${settings.pairs.length} pair${settings.pairs.length === 1 ? "" : "s"}`;
+  const toReview = settings.pairs.filter((id) => reviewFor(id).issues.length).length;
+  elements.reviewChip.hidden = toReview === 0 && view.filter !== "review";
+  elements.reviewChip.textContent = view.filter === "review" ? "Show all pairs" : `${toReview} to review`;
+  elements.reviewChip.title = "Desk prices on the wrong side of the reference rate, or set before the reference moved";
   elements.navPairCount.textContent = String(settings.pairs.length).padStart(
     2,
     "0",
@@ -932,6 +998,7 @@ function renderTable({
         ["stale-cache", "error"].includes(referenceMeta.cacheStatus);
       if (!hasReferenceIssue) return false;
     }
+    if (view.filter === "review" && !reviewFor(id).issues.length) return false;
     return true;
   }); // Sort the visible pairs based on the current view sort option, using different criteria for code, name, and rate sorting.
   const sortedPairs = [...visiblePairs];
@@ -981,7 +1048,9 @@ function renderTable({
         const rate = referenceRates[id];
         const pairPrices = settings.prices[id] ?? { buy: "", sell: "" };
         const boardIndex = settings.pairs.indexOf(id);
+        const review = reviewFor(id);
         const rowClasses = [
+          review.issues.length ? "needs-review" : "",
           animateRows || animatePair === id ? "row-enter" : "",
           highlightPair === id ? "row-highlight" : "",
         ]
@@ -1003,13 +1072,13 @@ function renderTable({
           ? formatRateObservation(rate, { month: "short", day: "numeric" })
           : "—";
         const refValue = rate
-          ? `<div class="reference-value ${stale ? "is-stale" : ""}"><strong>${escapeHtml(formatPairRate(rate.rate))} <small>${escapeHtml(quote)}</small></strong><small>1 ${escapeHtml(base)} · ${escapeHtml(refDate)}${cached ? " · CACHED" : stale ? " · STALE" : ""}</small></div>`
+          ? `<div class="reference-value ${stale ? "is-stale" : ""}"><strong>${escapeHtml(formatPairRate(rate.rate))} <small>${escapeHtml(quote)}</small></strong><small>1 ${escapeHtml(base)} · ${escapeHtml(refDate)}${cached ? " · CACHED" : stale ? " · STALE" : ""}</small>${review.issues.includes("reference-moved") ? `<small class="reference-moved">Moved ${escapeHtml(formatSignedPercent(review.drift))} since your prices were set</small>` : ""}</div>`
           : `<div class="reference-value is-missing"><strong>${referenceMeta.cacheStatus === "loading" ? "Loading…" : "No source rate"}</strong><small>${referenceMeta.cacheStatus === "loading" ? "" : !isSupportedPair(base, quote) ? "Use USD with gold or silver" : "Coverage unavailable"}</small></div>`;
         return `<tr class="${rowClasses}" style="--row-delay:${Math.min(index, 6) * 45}ms" data-pair="${escapeHtml(id)}">
         <td><div class="pair-cell"><span class="currency-chip">${escapeHtml(currencyMark(base))}</span><div class="pair-names"><strong>${escapeHtml(base)} <span aria-hidden="true">→</span> ${escapeHtml(quote)}</strong><small>${escapeHtml(currencyName(base))} / ${escapeHtml(currencyName(quote))}</small></div></div></td>
         <td>${refValue}</td>
-        <td><div class="customer-price">${priceText(pairPrices.buy, quote)}<button class="edit-price-button" type="button" data-edit-price="${escapeHtml(id)}" aria-label="${pairPrices.buy ? "Edit" : "Set"} desk buy price for ${escapeHtml(id)}">${pairPrices.buy ? "Edit" : "Set rate"}</button></div></td>
-        <td><div class="customer-price">${priceText(pairPrices.sell, quote, "sell-price")}<button class="edit-price-button" type="button" data-edit-price="${escapeHtml(id)}" aria-label="${pairPrices.sell ? "Edit" : "Set"} desk sell price for ${escapeHtml(id)}">${pairPrices.sell ? "Edit" : "Set rate"}</button></div></td>
+        <td><div class="customer-price">${priceText(pairPrices.buy, quote, "", review.margins.buy, "You would pay more than the reference rate")}<button class="edit-price-button" type="button" data-edit-price="${escapeHtml(id)}" aria-label="${pairPrices.buy ? "Edit" : "Set"} desk buy price for ${escapeHtml(id)}">${pairPrices.buy ? "Edit" : "Set rate"}</button></div></td>
+        <td><div class="customer-price">${priceText(pairPrices.sell, quote, "sell-price", review.margins.sell, "You would sell for less than the reference rate")}<button class="edit-price-button" type="button" data-edit-price="${escapeHtml(id)}" aria-label="${pairPrices.sell ? "Edit" : "Set"} desk sell price for ${escapeHtml(id)}">${pairPrices.sell ? "Edit" : "Set rate"}</button></div></td>
         <td class="action-cell"><div class="row-actions">
           <button class="row-action row-drag-handle" type="button" draggable="true" data-drag-pair="${escapeHtml(id)}" aria-label="Drag ${escapeHtml(id)} to reorder it" title="Drag to reorder">⠿</button>
           <button class="row-action" type="button" data-move-pair="${escapeHtml(id)}" data-move-direction="up" aria-label="Move ${escapeHtml(id)} earlier in board order" title="Move earlier" ${boardIndex === 0 ? "disabled" : ""}>↑</button>
@@ -1487,6 +1556,9 @@ function applyViewPreferences({ persist = true } = {}) {
   elements.pairFilter.value = view.filter; // Set the filter dropdown in the UI to reflect the current view filter (e.g., all, priced, needs-prices, reference-issues), allowing users to see which filter is active.
   elements.pairSort.value = view.sort; // Set the sort dropdown in the UI to reflect the current view sort option (e.g., code, name, rate-high, rate-low, board), allowing users to see which sorting method is active.
   elements.boardDensity.value = view.density; // Set the density dropdown in the UI to reflect the current view density (comfortable or compact), allowing users to see which density setting is active.
+  elements.pairCardSort.value = view.pairCardSort;
+  elements.marketCardSort.value = view.marketCardSort;
+  elements.quoteCardSort.value = view.quoteCardSort;
   elements.boardTheme.value = view.theme; // Set the theme dropdown in the UI to reflect the current view theme (light or dark), allowing users to see which theme setting is active.
   const themeAction = view.theme === "night" ? "Switch to bright mode" : "Switch to night mode";
   elements.themeToggle.setAttribute("title", themeAction);
@@ -1586,7 +1658,95 @@ function openPriceDialog(id) {
     : "Reference data is not a customer price";
   elements.priceValidation.hidden = true;
   elements.priceValidation.textContent = "";
+  elements.priceMargin.value = view.marginPercent;
+  elements.applyMargin.disabled = !reference;
+  updateMarginPreview();
   elements.priceDialog.showModal(); // Open the price dialog modal to allow the user to set or edit desk prices for the selected currency pair.
+}
+
+// Under the price fields: what the prices now in the dialog would earn against the reference.
+function updateMarginPreview() {
+  const reference = referenceRates[elements.pricePairId.value];
+  const margins = deskMargins({ reference: reference?.rate, buy: elements.priceBuy.value.trim(), sell: elements.priceSell.value.trim() });
+  const parts = [];
+  if (margins.buy !== null) parts.push(margins.buy < 0 ? `Buying ${formatSignedPercent(-margins.buy).slice(1)} above the reference` : `Buy margin ${formatSignedPercent(margins.buy)}`);
+  if (margins.sell !== null) parts.push(margins.sell < 0 ? `Selling ${formatSignedPercent(-margins.sell).slice(1)} below the reference` : `Sell margin ${formatSignedPercent(margins.sell)}`);
+  if (margins.spread !== null) parts.push(`Spread ${margins.spread.toFixed(2)}%`);
+  elements.marginPreview.dataset.state = (margins.buy ?? 0) < 0 || (margins.sell ?? 0) < 0 ? "warning" : "ok";
+  elements.marginPreview.textContent = !reference
+    ? "No reference rate to compare these prices with."
+    : parts.length ? parts.join(" · ") : "Enter a price to see its margin against the reference.";
+}
+
+// Fills both price fields a chosen margin either side of the reference. Nothing is saved until
+// the operator presses Save.
+function fillPricesFromMargin() {
+  const reference = referenceRates[elements.pricePairId.value];
+  const margin = elements.priceMargin.value.trim();
+  const prices = MARGIN_PATTERN.test(margin) ? pricesFromMargin(reference?.rate, margin) : null;
+  if (!prices) {
+    elements.priceValidation.textContent = reference
+      ? "Enter a margin between 0 and 99.99 percent, using a decimal point."
+      : "There is no reference rate to work from for this pair.";
+    elements.priceValidation.hidden = false;
+    return;
+  }
+  elements.priceValidation.hidden = true;
+  elements.priceBuy.value = prices.buy;
+  elements.priceSell.value = prices.sell;
+  view.marginPercent = margin;
+  writeJson(VIEW_STORAGE_KEY, view);
+  updateMarginPreview();
+}
+
+// The desk's own price list as rows, for copying or downloading.
+function currentRateSheet() {
+  return rateSheetRows(settings.pairs, settings.prices, referenceRates);
+}
+
+async function copyRateSheet() {
+  const rows = currentRateSheet();
+  if (!rows.length) {
+    announce("Set at least one desk price before copying a rate sheet.");
+    return;
+  }
+  const when = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date());
+  const text = rateSheetText(rows, { title: "Exchange rates", when });
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Without clipboard permission, fall back to a selection the browser can copy.
+    const holder = document.createElement("textarea");
+    holder.value = text;
+    holder.setAttribute("readonly", "");
+    holder.style.cssText = "position: fixed; top: 0; left: 0; opacity: 0; white-space: pre;";
+    document.body.append(holder);
+    holder.select();
+    document.execCommand("copy");
+    holder.remove();
+  }
+  elements.copyRateSheet.textContent = "Copied";
+  window.setTimeout(() => { elements.copyRateSheet.textContent = "Copy rate sheet"; }, 1600);
+  announce(`Rate sheet with ${rows.length} pair${rows.length === 1 ? "" : "s"} copied.`);
+}
+
+function downloadRateSheet() {
+  const rows = currentRateSheet();
+  if (!rows.length) {
+    announce("Set at least one desk price before downloading a rate sheet.");
+    return;
+  }
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([rateSheetCsv(rows)], { type: "text/csv;charset=utf-8" }));
+  // Named for the desk's own calendar day, which around midnight is not the UTC one.
+  const today = new Date();
+  const day = [today.getFullYear(), today.getMonth() + 1, today.getDate()].map((part) => String(part).padStart(2, "0")).join("-");
+  link.download = `counterline-rates-${day}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  announce(`Rate sheet with ${rows.length} pair${rows.length === 1 ? "" : "s"} downloaded.`);
 }
 
 // Close a given dialog if it is currently open. This function checks the dialog's open state and calls the close method if necessary.
@@ -1621,7 +1781,8 @@ function handlePriceSave(event) {
     return;
   } // Ensure that the buy rate is less than or equal to the sell rate, providing feedback if this condition is not met.
   if (buy || sell)
-    settings.prices[id] = { buy, sell }; // If either buy or sell rate is provided, store them in the settings for the specified pair.
+    // The time and the reference a price was set against let the board flag it once the reference has moved.
+    settings.prices[id] = { buy, sell, setAt: new Date().toISOString(), referenceAtSet: referenceRates[id]?.rate ?? null };
   else delete settings.prices[id]; // If both buy and sell rates are empty, remove any existing prices for the specified pair from the settings.
   const saved = saveSettings(); // Persist the updated settings to localStorage, returning a boolean indicating whether the save was successful.
   closeDialog(elements.priceDialog); // Close the price dialog after saving the prices.
@@ -1629,8 +1790,8 @@ function handlePriceSave(event) {
   renderCalculator(); // Re-render the calculator to reflect any changes in desk prices for the selected pair.
   announce(
     saved
-      ? `${id} desk prices saved on this browser.`
-      : `${id} prices are active for this session, but browser storage is unavailable.`,
+      ? `${id} desk prices saved on this device.`
+      : `${id} prices are active for this session, but could not be saved on this device.`,
   );
 }
 
@@ -1709,10 +1870,10 @@ function initializeEvents() {
     chartFor: (card) => chartGeometry.get(card),
     describe: (chart, point) => ({
       tag: chart.kind === "estimated" ? "Estimate" : chart.kind === "stale" ? "Last observed" : "",
-      value: chart.market ? formatUsdMetalPrice(point.rate) : `${formatPairRate(point.rate)} ${chart.quote}`,
+      value: chart.market ? formatUsdPrice(point.rate) : `${formatPairRate(point.rate)} ${chart.quote}`,
       when: formatHistoryTooltip(point.date),
     }),
-    isBusy: () => Boolean(pairCharts.reorder?.isActive() || metalCharts.reorder?.isActive()),
+    isBusy: () => Boolean(pairCharts.reorder?.isActive() || marketCharts.reorder?.isActive()),
   });
   // Moving a card in the DOM replays its running animations, so they end when a card is picked up.
   const settleCards = (cards) => {
@@ -1722,7 +1883,10 @@ function initializeEvents() {
   pairCharts.reorder = createCardReorder(elements.historyGrid, {
     onPickUp: settleCards,
     onReorder: (order) => {
+      // An order arranged by hand replaces whatever sort was on.
       pairHistoryOrder = reconcileChartOrder(order, settings.pairs);
+      view.pairCardSort = "custom";
+      applyViewPreferences();
       saveCardOrder("Currency history", PAIR_HISTORY_ORDER_KEY, pairHistoryOrder);
     },
     onIdle: () => {
@@ -1730,14 +1894,16 @@ function initializeEvents() {
     },
     announce,
   });
-  metalCharts.reorder = createCardReorder(elements.marketHistoryGrid, {
+  marketCharts.reorder = createCardReorder(elements.marketHistoryGrid, {
     onPickUp: settleCards,
     onReorder: (order) => {
       marketHistoryOrder = reconcileChartOrder(order, MARKET_HISTORY_ASSETS.map(({ code }) => code));
-      saveCardOrder("Metals history", METAL_HISTORY_ORDER_KEY, marketHistoryOrder);
+      view.marketCardSort = "custom";
+      applyViewPreferences();
+      saveCardOrder("Metals and oil history", METAL_HISTORY_ORDER_KEY, marketHistoryOrder);
     },
     onIdle: () => {
-      if (metalCharts.renderPending) renderMarketHistory();
+      if (marketCharts.renderPending) renderMarketHistory();
     },
     announce,
   });
@@ -1745,6 +1911,20 @@ function initializeEvents() {
     grid.addEventListener("animationend", (event) => {
       if (event.animationName === "enter-up") event.target.classList.remove("is-entering");
       if (event.animationName === "chart-reveal") event.target.closest("[data-history-card-id]")?.classList.remove("is-drawing");
+    });
+  }
+  // Sorting the chart cards and the market cards by name or price.
+  const sortLabels = { custom: "in your own order", "name-asc": "by name, A to Z", "name-desc": "by name, Z to A", "price-asc": "by price, lowest first", "price-desc": "by price, highest first" };
+  for (const [control, key, render, label] of [
+    [elements.pairCardSort, "pairCardSort", renderPairHistory, "Currency charts"],
+    [elements.marketCardSort, "marketCardSort", renderMarketHistory, "Metal and oil charts"],
+    [elements.quoteCardSort, "quoteCardSort", renderMarketCardOrder, "Market cards"],
+  ]) {
+    control.addEventListener("change", () => {
+      view[key] = CARD_SORTS.includes(control.value) ? control.value : "custom";
+      applyViewPreferences();
+      render();
+      announce(`${label} shown ${sortLabels[view[key]]}.`);
     });
   }
   // Cards carry a soft light that follows the mouse; styles.css reads the position from here.
@@ -1807,10 +1987,10 @@ function initializeEvents() {
   }); // Handle clicks on history range buttons to update the selected range and load the corresponding pair history data.
   elements.marketHistoryRanges.addEventListener("click", (event) => {
     const button = event.target.closest?.("[data-market-history-range]");
-    if (!button || !elements.marketHistoryRanges.contains(button) || button.disabled || metalCharts.range === button.dataset.marketHistoryRange) return;
-    metalCharts.range = button.dataset.marketHistoryRange;
-    metalCharts.data = {};
-    metalCharts.series = {};
+    if (!button || !elements.marketHistoryRanges.contains(button) || button.disabled || marketCharts.range === button.dataset.marketHistoryRange) return;
+    marketCharts.range = button.dataset.marketHistoryRange;
+    marketCharts.data = {};
+    marketCharts.series = {};
     elements.marketHistoryRanges.querySelectorAll("[data-market-history-range]").forEach((rangeButton) => {
       rangeButton.setAttribute("aria-pressed", String(rangeButton === button));
     });
@@ -1853,6 +2033,8 @@ function initializeEvents() {
     Object.assign(view, DEFAULT_VIEW); // Reset the view preferences to their default values, including theme, density, filter, and sort options.
     applyViewPreferences(); // Apply the default view preferences to the document body and relevant UI elements, ensuring that the display reflects the reset state.
     renderTable(); // Re-render the rates table to reflect the reset display options, ensuring that the table layout and content are updated accordingly.
+    renderMarketHistory();
+    renderMarketCardOrder();
     announce("Board view options reset."); // Announce to the user that the board view options have been reset to their default values, providing feedback on the action taken.
   }); // Reset the display options to their default values when the reset button is clicked, and re-render the table to reflect the changes.
   elements.pairBase.addEventListener("change", updatePairPreview); // Update the pair preview in the add pair dialog whenever the base currency selection changes, providing immediate feedback to the user.
@@ -1885,6 +2067,25 @@ function initializeEvents() {
     );
   }); // Handle the submission of the add pair form, validating the selected currencies and adding the new pair to the board if valid. This includes saving settings, closing the dialog, re-rendering the table and calculator options, and announcing the result to the user.
   elements.priceForm.addEventListener("submit", handlePriceSave);
+  elements.priceBuy.addEventListener("input", updateMarginPreview);
+  elements.priceSell.addEventListener("input", updateMarginPreview);
+  elements.applyMargin.addEventListener("click", fillPricesFromMargin);
+  elements.priceMargin.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault(); // Enter in the margin field fills the prices; it does not save them.
+    fillPricesFromMargin();
+  });
+  elements.copyRateSheet.addEventListener("click", copyRateSheet);
+  elements.downloadRateSheet.addEventListener("click", downloadRateSheet);
+  elements.reviewChip.addEventListener("click", () => {
+    view.filter = view.filter === "review" ? "all" : "review";
+    applyViewPreferences();
+    renderTable();
+  });
+  // The customer display is a page of its own that reads the desk prices saved in this browser.
+  elements.openDisplay.addEventListener("click", () => {
+    window.open("/display.html", "counterline-display", "popup=yes,width=1280,height=800");
+  });
   document
     .querySelector("#clear-price-button")
     .addEventListener("click", () => {
@@ -2050,17 +2251,13 @@ loadRates(); // Fetch the latest reference rates for the selected currency pairs
 loadPairHistory(); // Fetch the history charts for the pairs on the board.
 loadMarketHistory();
 loadMarketQuotes();
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "visible") return;
-  for (const charts of [pairCharts, metalCharts]) charts.retryWhenVisible?.();
-});
 window.setInterval(
   () => {
     if (document.visibilityState !== "visible") return;
     loadRates();
-    // Intraday charts age within the hour; daily ones change once a day and wait for Refresh.
+    // The intraday views are redrawn so that their time axis keeps up; daily ones wait for Refresh.
     if (INTRADAY_HISTORY_RANGES.has(pairCharts.range)) loadPairHistory();
-    if (INTRADAY_HISTORY_RANGES.has(metalCharts.range)) loadMarketHistory();
+    if (INTRADAY_HISTORY_RANGES.has(marketCharts.range)) loadMarketHistory();
   },
   30 * 60 * 1000,
 ); // Refresh reference rates every 30 minutes, but only while the page is visible, to avoid requests nobody sees.
