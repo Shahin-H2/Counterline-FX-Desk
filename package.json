@@ -3,7 +3,7 @@
   "productName": "Counterline FX Desk",
   "version": "1.0.0",
   "description": "Exchange desk pricing: reference rates, your own buy and sell prices, and a customer display.",
-  "author": "Shahin-H2",
+  "author": "Shahin Hassanyan",
   "private": true,
   "type": "module",
   "main": "desktop/main.mjs",
