@@ -1,0 +1,63 @@
+# Builds the desktop installers and attaches them to a GitHub release.
+#
+# To make a release: set "version" in package.json, commit, then push a tag with the same
+# number, for example:   git tag v1.0.0 && git push origin v1.0.0
+# The macOS disk image is built on a Mac and the Windows installer on Windows. Both are added to
+# a draft release for the tag. Look the draft over on GitHub and publish it when it is right.
+name: Release desktop app
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  draft:
+    name: Draft release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check that the tag matches the version in package.json
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the package.json version ($version)."
+            exit 1
+          fi
+      - run: npm test
+      - name: Create the draft release unless it already exists
+        run: |
+          gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes --title "Counterline FX Desk ${GITHUB_REF_NAME#v}"
+
+  installer:
+    name: Installer (${{ matrix.name }})
+    needs: draft
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            installer: dist/*.dmg
+          - name: Windows
+            os: windows-latest
+            installer: dist/*.exe
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run dist
+      - name: Add the installer to the draft release
+        shell: bash
+        run: gh release upload "$GITHUB_REF_NAME" ${{ matrix.installer }} --clobber
