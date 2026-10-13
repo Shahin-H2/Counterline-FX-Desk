@@ -578,6 +578,11 @@ export function createApp({
       const oilRoute = eia.usesApiKey() ? "the EIA API" : "EIA's public history pages (no key set)";
       return `Market data: Frankfurter daily reference for currencies, gold and silver; crude oil from ${oilRoute}.`;
     },
+    // Starts fetching the oil prices before a page asks for them. EIA's public pages answer a
+    // script slowly, about ten seconds, and the first page would otherwise wait that long.
+    warmUp() {
+      eia.getSeries(Object.values(MARKET_ASSETS).flatMap((asset) => asset.oil ?? []));
+    },
   };
 }
 
@@ -597,5 +602,6 @@ if (isEntryPoint()) {
   createServer(app.handleRequest).listen(port, host, () => {
     console.log(`Counterline FX Desk running at http://${host.includes(":") ? `[${host}]` : host}:${port}`);
     console.log(app.describeMarketData());
+    app.warmUp();
   });
 }
