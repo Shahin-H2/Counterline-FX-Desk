@@ -8,7 +8,7 @@ import {
   parseDecimal,
 } from "./domain/decimal.js";
 import { CARD_SORTS, sortCards } from "./domain/card-sort.js";
-import { isObservationStale } from "./domain/freshness.js";
+import { isObservationStale, observationAgeInLocalDays } from "./domain/freshness.js";
 import { deskMargins, pricesFromMargin, reviewDeskPrice } from "./domain/margin.js";
 import { rateSheetCsv, rateSheetRows, rateSheetText } from "./domain/rate-sheet.js";
 import { createCardReorder, slide } from "./ui/card-reorder.js";
@@ -247,10 +247,15 @@ const HISTORY_RANGE_LABELS = {
   "6m": "6 months",
 };
 const SERIES_KINDS = new Set(["reference", "stale", "estimated"]);
-// How each data source is named in a status line and on a quote card.
+// How each data source is named in a status line and on a quote card. A source with `delay`
+// publishes in arrears, and every price from it is marked as delayed (see delayNotice).
 const SOURCE_NAMES = {
   Frankfurter: { history: "from Frankfurter's daily reference history", quote: "Frankfurter daily reference" },
-  EIA: { history: "of EIA daily spot prices", quote: "EIA daily spot price" },
+  EIA: {
+    history: "of EIA daily spot prices",
+    quote: "EIA daily spot price",
+    delay: "EIA publishes this price about once a week, a few days in arrears. It is not a live market price.",
+  },
 };
 const renderedCardMarkup = new WeakMap(); // card element -> the markup last written into it
 const chartGeometry = new WeakMap(); // card element -> its chart's points, for the hover read-out
@@ -495,22 +500,25 @@ function historyCardView(id, observations, series, cardIndex, { market = false, 
         .map((point) => `<circle class="history-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="1.9"/>`)
         .join("");
   const latest = points.at(-1);
+  // An estimate is never drawn for a source that publishes in arrears, so it needs no notice.
+  const delay = estimated ? null : delayNotice(series?.source, latest.date);
+  const delayText = delay ? [stale ? "Last observed" : "Delayed", delay.age].filter(Boolean).join(" · ") : "";
   const subject = market ? `${asset?.name ?? id} USD reference price` : `${base} to ${quote} reference rate`;
-  const ariaLabel = `${estimated ? "Illustrative interpolated estimate of " : stale ? "Last observed " : ""}${subject} from ${formatHistoryTooltip(points[0].date)} to ${formatHistoryTooltip(latest.date)}${series?.source ? `. Source: ${series.source}` : ""}`;
+  const ariaLabel = `${estimated ? "Illustrative interpolated estimate of " : stale ? "Last observed " : ""}${subject} from ${formatHistoryTooltip(points[0].date)} to ${formatHistoryTooltip(latest.date)}${series?.source ? `. Source: ${series.source}` : ""}${delay ? `. Delayed${delay.age ? `, ${delay.age}` : ""}` : ""}`;
   const latestValue = market ? formatUsdPrice(latest.rate) : formatPairRate(latest.rate);
   const latestPrefix = market ? "USD price" : `1 ${escapeHtml(base)} <span aria-hidden="true">=</span>`;
   // An estimate ends on the reference price it is anchored to, so the headline names that reference.
   const latestMeta = estimated
     ? `${escapeHtml(series?.baseline?.source ?? "Latest")} reference${series?.baseline?.date ? ` · ${escapeHtml(formatHistoryTooltip(series.baseline.date))}` : ""}`
     : `${escapeHtml(market ? id : quote)} · ${stale ? "last observed " : ""}${escapeHtml(formatHistoryTooltip(latest.date))}`;
-  const chip = estimated ? "INTERPOLATED ESTIMATE" : stale ? "LAST OBSERVED" : `${points.length} ${points.length === 1 ? "point" : "points"}`;
-  const chipTitle = [series?.source, series?.message].filter(Boolean).join(" · ");
+  const chip = estimated ? "INTERPOLATED ESTIMATE" : delay ? delayText.toUpperCase() : stale ? "LAST OBSERVED" : `${points.length} ${points.length === 1 ? "point" : "points"}`;
+  const chipTitle = [series?.source, series?.message, delay?.explanation].filter(Boolean).join(" · ");
   const strokeId = `${gradientId}-stroke`;
   const percent = (value) => `${((value / height) * 100).toFixed(2)}%`;
   return {
     kind,
     name,
-    className: `history-card${estimated ? " history-card-interpolated" : ""}${stale ? " history-card-stale" : ""}`,
+    className: `history-card${estimated ? " history-card-interpolated" : ""}${stale ? " history-card-stale" : ""}${delay ? " history-card-delayed" : ""}`,
     // For the hover read-out: where each point sits in the chart's own units, with its date and rate.
     chart: {
       width,
@@ -735,13 +743,23 @@ function formatSignedPercent(value) {
   return `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(2)}%`;
 }
 
+// The warning carried by a price from a source that publishes in arrears: how old the price is
+// today, and why. Null for a source that does not.
+function delayNotice(source, date) {
+  const explanation = SOURCE_NAMES[source]?.delay;
+  if (!explanation) return null;
+  const days = observationAgeInLocalDays(String(date).slice(0, 10));
+  return { age: days > 0 ? `${days} day${days === 1 ? "" : "s"} old` : "", explanation };
+}
+
 // Fills the quote cards of the markets section. Each card names its source and the date its
-// price was observed, and shows the move since the observation before it.
+// price was observed, and shows the move since the observation before it. A price from a source
+// that publishes in arrears also carries a tag saying that it is delayed and how old it is.
 async function loadMarketQuotes() {
   const cards = [...document.querySelectorAll("[data-market-code]")];
   const statusText = elements.marketStatus.querySelector("span:last-child");
   const dayLabel = (date) => formatDate(date, { month: "short", day: "numeric", timeZone: "UTC" });
-  const show = (card, { value, available, change, observation }) => {
+  const show = (card, { value, available, change, observation, delay = null }) => {
     const valueNode = card.querySelector("[data-market-value]");
     valueNode.textContent = value;
     valueNode.classList.toggle("market-value-unavailable", !available);
@@ -749,6 +767,10 @@ async function loadMarketQuotes() {
     changeNode.textContent = change;
     changeNode.classList.toggle("market-change-pending", !available);
     card.querySelector(".market-observation").textContent = observation;
+    const delayTag = card.querySelector(".delay-tag");
+    delayTag.hidden = !delay;
+    delayTag.textContent = delay ? ["Delayed", delay.age].filter(Boolean).join(" · ") : "";
+    delayTag.title = delay?.explanation ?? "";
   };
   try {
     const response = await fetch("/api/markets", { headers: { accept: "application/json" } });
@@ -768,7 +790,13 @@ async function loadMarketQuotes() {
         ? `${formatSignedPercent((Number(quote.rate) / previous - 1) * 100)} since ${dayLabel(quote.previous.date)}`
         : "Daily reference";
       // A stale quote is the last one the source delivered; its refresh failed.
-      show(card, { value: formatUsdPrice(quote.rate), available: true, change, observation: `${quote.source} · ${dayLabel(quote.date)}${quote.kind === "stale" ? " · not refreshed" : ""}` });
+      show(card, {
+        value: formatUsdPrice(quote.rate),
+        available: true,
+        change,
+        observation: `${quote.source} · ${dayLabel(quote.date)}${quote.kind === "stale" ? " · not refreshed" : ""}`,
+        delay: delayNotice(quote.source, quote.date),
+      });
     }
     elements.marketStatus.dataset.state = sources.size ? "ready" : "error";
     statusText.textContent = sources.size ? [...sources].join(" · ") : "Market prices are not available right now";
