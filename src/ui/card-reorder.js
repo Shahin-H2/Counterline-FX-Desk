@@ -33,6 +33,30 @@ export function slotAt(boxes, point, spread = 0) {
   ));
 }
 
+// Applies a DOM change and lets every element it displaces slide to its new place: note where
+// each one is, make the change, hold each visually where it was, then release it so the element's
+// own `transition: transform` rule in styles.css carries it over.
+export function slide(elements, change) {
+  const before = new Map(elements.map((element) => [element, element.getBoundingClientRect()]));
+  change();
+  const moved = elements.filter((element) => element.isConnected);
+  for (const element of moved) {
+    element.style.transition = "none";
+    element.style.transform = "none";
+  }
+  const after = new Map(moved.map((element) => [element, element.getBoundingClientRect()]));
+  for (const element of moved) {
+    const deltaX = before.get(element).left - after.get(element).left;
+    const deltaY = before.get(element).top - after.get(element).top;
+    element.style.transform = Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5 ? "" : `translate(${deltaX}px, ${deltaY}px)`;
+  }
+  void document.body.offsetWidth; // commit the held positions before the transition is switched back on
+  for (const element of moved) {
+    element.style.transition = "";
+    element.style.transform = "";
+  }
+}
+
 export function createCardReorder(grid, {
   itemSelector = "[data-history-card-id]",
   getId = (card) => card.dataset.historyCardId,
@@ -71,28 +95,10 @@ export function createCardReorder(grid, {
     };
   }
 
-  // Applies a DOM change and lets every card it displaces slide to its new place: note where each
-  // card is, make the change, hold each card visually where it was, then release it so the
-  // `transition: transform` rule in styles.css carries it over.
+  // Applies a DOM change; every card it displaces slides to its new place. The card being
+  // dragged is left out, because it follows the pointer instead.
   function reflow(change, includeActiveCard = false) {
-    const sliding = cards().filter((element) => includeActiveCard || element !== card);
-    const before = new Map(sliding.map((element) => [element, element.getBoundingClientRect()]));
-    change();
-    for (const element of sliding) {
-      element.style.transition = "none";
-      element.style.transform = "none";
-    }
-    const after = new Map(sliding.map((element) => [element, element.getBoundingClientRect()]));
-    for (const element of sliding) {
-      const deltaX = before.get(element).left - after.get(element).left;
-      const deltaY = before.get(element).top - after.get(element).top;
-      element.style.transform = Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5 ? "" : `translate(${deltaX}px, ${deltaY}px)`;
-    }
-    void grid.offsetWidth; // commit the held positions before the transition is switched back on
-    for (const element of sliding) {
-      element.style.transition = "";
-      element.style.transform = "";
-    }
+    slide(cards().filter((element) => includeActiveCard || element !== card), change);
   }
 
   function placeAt(items, from, to) {
