@@ -42,6 +42,7 @@ Every figure in the app carries its source and observation date. Both sources ar
 - The one week to six month charts are the sources' own daily observations.
 - The 5-minute and 24-hour charts for currencies and metals are **estimates**. They are drawn dashed and labelled "INTERPOLATED ESTIMATE": a repeatable random walk that ends on the latest reference rate and is sized by the pair's recent day-to-day movement. They show roughly how much a pair moves, not what it did.
 - Oil has no intraday chart, because an estimate of a week-old price would mislead.
+- Oil prices are always days behind the market. Each oil card and oil chart carries an amber **Delayed** tag that says how many days old its price is, counted on the viewer's own calendar.
 - If a source stops answering, the last data it delivered stays on screen marked as not refreshed, and a chart with no reference price at all says it is unavailable instead of showing an invented level.
 
 ### Using these sources in a commercial product
