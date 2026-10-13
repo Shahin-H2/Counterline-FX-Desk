@@ -402,7 +402,7 @@ body.is-card-dragging { user-select: none; -webkit-user-select: none; }
 body.is-card-dragging * { cursor: grabbing !important; }
 .history-card-interpolated { border-style: dashed; }
 .history-card-stale .history-observation-count { color: #81652f; background: #f6f0df; font: 600 8px/1.25 "DM Mono", monospace; letter-spacing: .15px; }
-.history-card-interpolated .history-observation-count { max-width: 132px; color: #81652f; background: #f6f0df; font: 600 8px/1.25 "DM Mono", monospace; letter-spacing: .15px; white-space: normal; text-align: center; }
+.history-card-interpolated .history-observation-count, .history-card-delayed .history-observation-count { max-width: 132px; color: #81652f; background: #f6f0df; font: 600 8px/1.25 "DM Mono", monospace; letter-spacing: .15px; white-space: normal; text-align: center; }
 .history-card-loading:hover { transform: none; box-shadow: none; }
 .history-card-loading > * { border-radius: 4px; background: linear-gradient(100deg, #f0f4ef 30%, #e7eee6 45%, #f0f4ef 60%); background-size: 200% 100%; animation: chart-shimmer 1.25s ease-in-out infinite; }
 .history-loading-line { width: 46%; height: 16px; }
@@ -415,9 +415,10 @@ body.is-card-dragging * { cursor: grabbing !important; }
 .history-card-title h3 span { margin: 0 3px; color: #89a17e; }
 .history-card-title p { margin: 3px 0 0; overflow: hidden; color: #8b9890; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .history-observation-count { flex: 0 0 auto; padding: 4px 6px; border-radius: 4px; color: #75867a; background: #f0f4ee; font: 400 10px "DM Mono", monospace; }
-.history-latest { display: flex; align-items: baseline; gap: 5px; margin-top: 13px; color: #839087; font: 400 10px "DM Mono", monospace; }
+.history-latest { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 5px; margin-top: 13px; color: #839087; font: 400 10px "DM Mono", monospace; }
 .history-latest strong { color: #315e49; font: 700 20px/1 "Manrope", sans-serif; letter-spacing: -.45px; }
 .history-latest small { margin-left: auto; color: #87948b; font: 400 10px "DM Sans", sans-serif; white-space: nowrap; }
+.history-latest > span { white-space: nowrap; }
 .history-chart { display: block; width: 100%; height: 155px; margin-top: 8px; overflow: visible; }
 .history-gridline line { stroke: var(--chart-grid); stroke-width: 1; }
 .history-gridline text, .history-axis-label { fill: var(--chart-label); font: 10px "DM Mono", monospace; }
@@ -665,7 +666,7 @@ body {
 .market-card-brent { --asset-tint: 83 139 127; }
 .market-card-top, .market-card-name, .market-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .market-card-top { margin-bottom: 15px; }
-.market-symbol { display: grid; width: 33px; height: 33px; place-items: center; border: 1px solid rgb(var(--asset-tint) / 25%); border-radius: 10px; color: rgb(var(--asset-tint) / 100%); background: rgb(var(--asset-tint) / 10%); font: 700 13px/1 "Manrope", sans-serif; letter-spacing: -.3px; }
+.market-symbol { display: grid; min-width: 33px; height: 33px; padding: 0 6px; place-items: center; border: 1px solid rgb(var(--asset-tint) / 25%); border-radius: 10px; color: rgb(var(--asset-tint) / 100%); background: rgb(var(--asset-tint) / 10%); font: 700 13px/1 "Manrope", sans-serif; letter-spacing: -.3px; }
 .market-kind { color: #8a998d; font: 500 9px "DM Mono", monospace; letter-spacing: .8px; }
 .market-card-name { justify-content: flex-start; gap: 8px; }
 .market-card-name h3 { margin: 0; color: #294136; font: 700 16px/1.2 "Manrope", sans-serif; letter-spacing: -.3px; }
@@ -674,11 +675,11 @@ body {
 .market-value-unavailable { color: #8a968b; font: 600 14px/1.3 "DM Sans", sans-serif; letter-spacing: 0; }
 .market-unit { margin-top: 4px; color: #89968b; font-size: 11px; }
 .market-unit span { padding: 0 3px; color: #b3beb2; }
-.market-card-bottom { align-items: flex-end; margin-top: auto; padding-top: 12px; }
+.market-card-bottom { flex-wrap: wrap; align-items: flex-end; gap: 2px 10px; margin-top: auto; padding-top: 12px; }
 .market-change, .market-observation { color: #87958a; font-size: 10px; }
-.market-change { font-weight: 600; }
+.market-change { font-weight: 600; white-space: nowrap; }
 .market-change-pending { color: #997d4c; }
-.market-observation { text-align: right; }
+.market-observation { margin-left: auto; text-align: right; }
 .markets-footnote { display: flex; align-items: flex-start; gap: 9px; margin-top: 17px; padding: 11px 12px; border: 1px solid rgb(224 232 222 / 78%); border-radius: 9px; color: #718176; background: rgb(248 250 246 / 75%); }
 .markets-footnote-mark { display: grid; width: 17px; height: 17px; flex: 0 0 auto; place-items: center; border: 1px solid #b9cbae; border-radius: 50%; color: #6b8c5c; font: 600 10px "DM Mono", monospace; }
 .markets-footnote p { margin: 0; font-size: 11px; line-height: 1.5; }
@@ -763,6 +764,7 @@ body[data-theme="night"] .history-card:hover { border-color: #4a6352; box-shadow
 body[data-theme="night"] .history-card.is-dragging, body[data-theme="night"] .history-card.is-lifted { border-color: #9cba7d; box-shadow: 0 18px 34px rgb(0 0 0 / 32%); }
 body[data-theme="night"] .history-grid.is-reordering .history-card:hover:not(.is-dragging, .is-lifted) { border-color: #304239; }
 body[data-theme="night"] .history-card-interpolated .history-observation-count,
+body[data-theme="night"] .history-card-delayed .history-observation-count,
 body[data-theme="night"] .history-card-stale .history-observation-count { color: #e5ca88; background: #403927; }
 body[data-theme="night"] .history-card-loading > * { background: linear-gradient(100deg, #26362e 30%, #304339 45%, #26362e 60%); background-size: 200% 100%; }
 body[data-theme="night"] .history-latest, body[data-theme="night"] .history-latest small { color: #9aada0; }
@@ -1209,3 +1211,13 @@ body[data-theme="night"] .display-sell strong { color: #ebd39d; }
 @media (min-width: 1250px) {
   .markets-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/*  ==========================================================================
+                              Delayed prices
+    ========================================================================== */
+/* A price from a source that publishes in arrears (crude oil, from EIA) says on its card that it
+   is delayed and how old it is. The chart cards say the same in their top right tag. */
+.delay-tag { display: inline-flex; align-items: center; align-self: flex-start; gap: 6px; margin-top: 9px; padding: 3px 8px 3px 7px; border: 1px solid rgb(166 107 21 / 24%); border-radius: 5px; color: #8a5f14; background: #fcf1d8; font: 600 9px/1.4 "DM Mono", monospace; letter-spacing: .6px; text-transform: uppercase; white-space: nowrap; cursor: help; }
+.delay-tag[hidden] { display: none; }
+.delay-tag::before { flex: 0 0 auto; width: 5px; height: 5px; border-radius: 50%; background: currentcolor; content: ""; }
+body[data-theme="night"] .delay-tag { border-color: rgb(232 184 96 / 30%); color: #f0cf8c; background: rgb(232 184 96 / 15%); }
