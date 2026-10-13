@@ -1,73 +1,144 @@
 # Counterline FX Desk
 
-A local, single-workspace currency reference and counter-pricing board. The board starts with common USD pairs and also lets an operator add any pair listed by the reference feed. Customer buy/sell values are separate, manually entered rates; no spread, fee, or margin is inferred.
+A pricing board for a currency exchange desk. It shows daily reference rates for currencies, gold, silver and crude oil, and next to them the desk's own buy and sell prices, which you enter yourself. A reference rate is never presented as a customer price, and no spread or fee is applied for you.
 
-## Run locally
+## Download and open
 
-Requires Node.js 18 or later. No package installation is needed.
+Installers are attached to each release on the repository's **Releases** page. Nothing else needs to be installed.
+
+| Computer | File | To install |
+| --- | --- | --- |
+| Mac with macOS 13 or later (Apple silicon or Intel) | `Counterline-FX-Desk-<version>-mac.dmg` | Open the file and drag the app onto Applications. |
+| Windows 10 or 11 | `Counterline-FX-Desk-<version>-windows-setup.exe` | Open the file. It installs for the current user and starts the app. |
+
+The installers are not yet signed with a paid developer certificate, so the first time the app is opened the system asks for confirmation:
+
+- **macOS** says it could not verify the app. Open **System Settings → Privacy & Security**, scroll to the message about Counterline FX Desk and choose **Open Anyway**. This is needed once.
+- **Windows** shows "Windows protected your PC". Choose **More info**, then **Run anyway**.
+
+See [Signing](#signing) for how to remove both prompts.
+
+Desk prices, the pair list and the layout are saved on the computer the app runs on. They are not sent anywhere, and they are not shared between computers.
+
+## What the desk gets
+
+- **Rates board.** Reference rate, observation date and your buy and sell prices for each pair. Add any pair the reference feed lists, reverse a pair, reorder rows by dragging.
+- **Margin guard.** Each desk price shows its margin against the reference rate. A buy price above the reference, a sell price below it, or a reference that has moved 0.5% or more since the prices were set is flagged, and a chip above the board counts the pairs to review. In the price dialog, **Fill both prices** sets a buy and sell price a chosen margin either side of the reference.
+- **Rate sheet.** **Copy rate sheet** puts the desk's prices on the clipboard as an aligned text table for a message or a printout; it leaves the reference rates out. **CSV** downloads the same prices with their reference rates, for records.
+- **Customer display.** A second window for a screen that faces customers: the desk's buy and sell prices in large type and a clock, with no reference rates or margins. It follows the main window as prices are saved, and has a full screen button.
+- **Charts.** Price history for every pair on the board and for gold, silver, WTI and Brent, from five minutes to six months. Hover or tap a chart for the date and price of a point.
+- **Sorting.** The chart cards and the market cards can be sorted by name (A to Z, Z to A) or by price (low to high, high to low). Chart cards can also be arranged by hand: drag a card, press and hold it on a touch screen, or focus it and use Space and the arrow keys. Doing so switches that group back to your own order, which is saved.
+- **Calculator.** An indicative conversion at the reference rate and, when the pair has desk prices, what the customer pays or receives at them.
+
+## Where the prices come from
+
+| Prices | Source | Updated | Key needed |
+| --- | --- | --- | --- |
+| Currencies, gold (XAU), silver (XAG) | [Frankfurter](https://frankfurter.dev/), blended from central banks and official sources | Daily | No |
+| Crude oil: WTI and Brent | [U.S. Energy Information Administration](https://www.eia.gov/dnav/pet/pet_pri_spt_s1_d.htm) daily spot prices | About weekly, a few days in arrears | No (optional, see below) |
+
+Every figure in the app carries its source and observation date. Both sources are daily, so nothing in the app is a live market price:
+
+- The one week to six month charts are the sources' own daily observations.
+- The 5-minute and 24-hour charts for currencies and metals are **estimates**. They are drawn dashed and labelled "INTERPOLATED ESTIMATE": a repeatable random walk that ends on the latest reference rate and is sized by the pair's recent day-to-day movement. They show roughly how much a pair moves, not what it did.
+- Oil has no intraday chart, because an estimate of a week-old price would mislead.
+- If a source stops answering, the last data it delivered stays on screen marked as not refreshed, and a chart with no reference price at all says it is unavailable instead of showing an invented level.
+
+### Using these sources in a commercial product
+
+This is a summary of what the sources publish, not legal advice. Check the linked pages before you sell or publish the app.
+
+- **Frankfurter** states that its API is free for commercial use and that the rates themselves fall under each underlying provider's terms. It also says the service is not built for live trading. Some underlying central banks, the ECB among them, publish their reference rates for information only and discourage using them for transactions.
+- **EIA** states that its publications are in the public domain and may be used and distributed, and asks for an acknowledgment with the date, which the app shows on every oil price. EIA must not be shown as endorsing a product and its logo must not be used. Note that EIA's spot price table names Refinitiv (an LSEG business) as the source of the WTI and Brent series. Ask EIA to confirm that redistributing that series in a paid product is covered before relying on it.
+- **There is no free intraday feed** for currencies, metals or oil that is licensed for commercial display. Before a public launch, either remove the two estimated chart ranges or license an intraday feed for them.
+- Yahoo Finance and FRED were considered and not used. Yahoo offers no official API, and the libraries that read it are unofficial and not endorsed by Yahoo, so there is no licence to rely on. FRED's terms require written consent for commercial use.
+
+### Optional: an EIA API key
+
+Oil works without a key, by reading EIA's public history pages. A free key from <https://www.eia.gov/opendata/> switches the app to EIA's API, which is quicker and does not depend on the layout of a web page. Put it in a text file as one line:
+
+```
+EIA_API_KEY=your-key
+```
+
+- Running from source: save the file as `.env` in the project folder (copy `.env.example`).
+- Installed app: save it as `settings.env` in the app's data folder, which is `~/Library/Application Support/Counterline FX Desk` on macOS and `%APPDATA%\Counterline FX Desk` on Windows. Restart the app.
+
+The key is sent to EIA in a request header and never appears in a URL or in the pages.
+
+## Run from source
+
+The server and the tests need Node.js 20 or later and no installed packages.
 
 ```sh
 npm start
 ```
 
-Then open <http://127.0.0.1:4173>. The app binds to localhost by default. Set `PORT` or `HOST` to change the development server address. The server has no authentication and is intended for local evaluation, not direct public deployment.
-
-The app works without any API key: currencies, gold and silver all come from Frankfurter, and the 5-minute and 24-hour charts show labelled estimates.
-
-Twelve Data is optional and adds observed intraday data. To turn it on, copy `.env.example` to `.env` and set both values there, then restart the server:
-
-```sh
-TWELVE_DATA_API_KEY=your-key
-TWELVEDATA_EXTERNAL_DISPLAY_LICENSE=confirmed
-```
-
-The server reads `.env` only. `.env.example` is a template that is committed to Git and never loaded, so a key written there does nothing and is published with the repository. Set `TWELVEDATA_EXTERNAL_DISPLAY_LICENSE=confirmed` only when the account has rights to display the data: Twelve Data's free Basic plan is for internal, non-display use. The server prints which mode it is in when it starts.
-
-Run the domain, provider and route checks with:
+Then open <http://127.0.0.1:4173>. `PORT` and `HOST` change the address. The server has no sign-in and is meant for one computer; do not put it on the public internet as it is.
 
 ```sh
 npm test
 ```
 
-## Rate data and semantics
+Without an EIA key, expect the first oil prices about ten seconds after the server starts: EIA answers scripted requests to its web pages slowly. The server starts fetching them as soon as it is up, and keeps them for six hours.
 
-- The replaceable starter adapter is Frankfurter's `/v2/rates` API. It supplies daily blended reference rates from central banks and official sources; it needs no API key. The pair convention is `quote currency per one base currency`, retained with each source observation date.
-- Pair rows can be reordered by dragging the grip or using the accessible earlier/later buttons. The reverse-direction action changes that row in place; customer prices stay attached to their original pair direction and are never reciprocated automatically.
-- The UI labels the reference source, shows the observation date per pair and the last check time, and marks an observation stale after it is more than three calendar days old. The local server caches successful rate responses for 10 minutes. If a later fetch fails, it returns its last successful server cache with an explicit stale-cache state. The browser also retains the last response to identify a display during a server outage.
-- Every chart always draws a line, and every chart card says what its data is. The server picks the best source it has for each series, in this order:
-  1. **Observed.** Twelve Data, when it is on: five one-minute observations for the 5-minute view, 24 hourly ones for the 24-hour view, and daily bars for gold and silver.
-  2. **Reference.** Frankfurter's daily observations, for every daily range (one week to six months). This is the normal source for currency pairs, and for gold and silver when Twelve Data is off. No key is needed.
-  3. **Last observed.** If a refresh fails or a rate limit is hit, the last series a provider delivered is kept and marked "LAST OBSERVED" (for up to 30 minutes on the 5-minute view, 6 hours on the 24-hour view, 36 hours on daily Twelve Data series, 72 hours on Frankfurter history).
-  4. **Interpolated estimate.** Otherwise `generateFallbackSeries` in `server.mjs` draws an estimate: a repeatable random walk on the same time grid that ends exactly on the latest Frankfurter reference rate, sized by the pair's own recent day-to-day movement. The card is dashed and labelled "INTERPOLATED ESTIMATE", its low and high read "Est.", and its headline figure is the real reference rate. An estimate is an illustration, not observed market history.
-  5. **Unavailable.** With no reference rate at all there is nothing to anchor on, and the card says so instead of inventing a price level.
-- Gold (XAU) and silver (XAG) are quoted in USD per troy ounce. The quote cards show Twelve Data's latest price when it is on, and otherwise Frankfurter's daily reference price with the change since the observation before it. A quote card never shows an estimate. Both metals can be added to the pair board against USD in either direction.
+## The desktop app
+
+The desktop app is the same pages and the same request handler in an [Electron](https://www.electronjs.org/) window. No network port is opened: the window is answered directly, under the fixed address `app://counterline`, which is also why its saved prices survive restarts. The pages get no access to Node or Electron, cannot navigate away from the app, and links to other sites open in the computer's browser. The code is in `desktop/main.mjs`.
+
+Building it needs **Node.js 22.12 or later** (Electron's tools do not run on Node 20).
+
+```sh
+npm install        # once: installs Electron and electron-builder
+npm run desktop    # open the app from this folder
+npm run dist       # build the installer for this computer's system into dist/
+```
+
+On a Mac, `npm run dist` builds the `.dmg`, and `npx electron-builder --win --publish never` builds the Windows installer as well. Only the app's own files go into an installer (`electron-builder.yml` lists them); `.env` is never included.
+
+The app keeps its settings in its own data folder, separately from any browser. Prices entered at `http://127.0.0.1:4173` do not appear in the desktop app, and the other way round.
+
+### Releases
+
+`.github/workflows/release.yml` builds both installers on GitHub. Set `version` in `package.json`, commit, and push a tag with the same number:
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow runs the tests, builds the macOS disk image on a Mac and the Windows installer on Windows, and attaches both to a draft release. Publish the draft on GitHub when it looks right.
+
+### Signing
+
+Without signing, every customer sees the warnings described under [Download and open](#download-and-open).
+
+- **macOS** needs an Apple Developer Program membership. With a Developer ID certificate available to the build (`CSC_LINK` and `CSC_KEY_PASSWORD`) and notarization credentials (`APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`), delete the `identity: "-"` line in `electron-builder.yml` and electron-builder signs and notarizes the app.
+- **Windows** needs a code signing certificate, or Azure Trusted Signing. See <https://www.electron.build/code-signing>.
+
+Before the first public release, also set `appId` in `electron-builder.yml` and `author` in `package.json` to your own. Windows treats an installer with a different `appId` as a different program, so choose it once.
+
+### Icon
+
+`build/icon.svg` is the drawing. `build/icon-mac.png` is that drawing exported at 1024 × 1024, and `build/icon.png` is the same drawing cropped to its rounded square (viewBox `84 84 856 856`) for Windows. Re-export both after changing the drawing; electron-builder makes the `.icns` and `.ico` files from them.
+
+## Rate semantics
+
+- A pair's rate is the amount of quote currency per one unit of base currency, and is kept with its observation date. An observation more than three calendar days old is marked stale.
+- The server keeps a successful rates response for 10 minutes and chart history for 5 minutes. When a refresh fails it serves the last response it has, marked as such (history for up to 72 hours, oil for up to 14 days). The page also keeps the last rates it showed, so it can say what it is displaying during an outage.
+- Gold and silver are US dollars per troy ounce; oil is US dollars per barrel. A market card shows the source's latest daily price and the change since the observation before it, never an estimate.
 - Frankfurter rounds small rates to a few digits (USD to XAU arrives as 0.00024), so a pair quoted in a metal, or any pair whose rate is below 0.01, is fetched in the opposite direction and inverted on the server.
-- Twelve Data responses are cached in memory for five minutes and shared between concurrent requests. Currency pairs travel in one batched request; each metal is requested on its own, so a plan without silver still returns gold. A limiter keeps the app inside the plan's credits (8 per minute and 800 per day by default; set `TWELVE_DATA_CREDITS_PER_MINUTE` and `TWELVE_DATA_CREDITS_PER_DAY` for other plans). Series that do not fit in the current minute are served from the fallback order above, and the page asks again by itself when credits return. After an HTTP 429 nothing is sent until the minute, or the day, turns. A symbol the plan does not include is remembered for an hour instead of being asked for again. The key is sent in the `Authorization` header and never appears in a URL.
-- Twelve Data's free Basic plan includes gold (XAU/USD) but not silver (XAG/USD), which needs a paid plan; silver then stays on Frankfurter. The same plan's terms cover internal, non-display use only, which is why the app also requires `TWELVEDATA_EXTERNAL_DISPLAY_LICENSE=confirmed` before it uses the key. The app does not create an account or subscribe to a plan.
-- Chart cards in both history grids can be reordered like iOS widgets: drag a card with the mouse, press and hold it on a touch screen, or focus it and use Space, the arrow keys and Space again (Escape cancels). Each grid's order is saved in this browser.
-- Hovering a chart, or tapping it on a touch screen, shows a crosshair and a label with the date and price of the nearest point. On an estimated chart the label says "Estimate".
-- The workspace sits on a slow night-sky backdrop: drifting nebula light, two star fields, an occasional comet, and glass surfaces that let a little of it through. The stars are painted once on canvas by `src/ui/cosmos.js`; everything that loops animates only `transform` or `opacity`, so the page does no style or layout work while idle, and all of it stops when the system asks for reduced motion.
-- The server sends the browser only the app's own files (`index.html`, `styles.css`, `src/app.js`, `src/domain/`, `src/ui/`). `.env`, `.git` and the server source cannot be downloaded.
-- Oil cards remain placeholders until an oil source is configured. The diamond card and graph were removed because the workspace does not use a universal live diamond spot price.
-- Desk prices are manual customer buy/sell quotes, stored in this browser's `localStorage`. A buy quote cannot exceed its sell quote. The quick calculator can switch between available base and quote currencies, including Iranian Rial (IRR), and shows a separately labeled indicative reference conversion. When that exact pair is on the board, it also shows the customer buy/sell payout. Calculations use decimal-safe integer arithmetic and round half up to the quote currency's minor unit. Fees are not modeled.
-- A Frankfurter/central-bank reference observation is not an executable customer quote. Frankfurter says its API and rates are supplied without warranty, rates can be late, missing or revised, and underlying source terms apply. Some underlying sources discourage transaction use. Review source-specific terms and obtain any rights needed for public/commercial display before operating this as a customer-facing product.
+- Desk prices are entered by hand. A buy price cannot be higher than its sell price. Reversing a pair never converts its prices: they stay with the direction they were entered for.
+- Calculations use exact decimal arithmetic and round half up to the quote currency's minor unit. Fees are not modelled.
+- The server sends a browser only the pages' own files (`index.html`, `display.html`, `styles.css`, `src/app.js`, `src/display.js`, `src/domain/`, `src/ui/`). `.env`, `.git` and the server's source cannot be downloaded.
 
-## Data provider terms
+## Source documentation
 
-Twelve Data's Basic plan lists 8 API credits per minute and 800 per day, but its terms limit that tier to internal, non-display use. Its Business Venture plan lists external-display access and commodity data starting at $149/month. Confirm exchange and regional permissions and attribution requirements with Twelve Data before client-facing use. The app requires an explicit server-side license setting; that setting does not replace a valid vendor entitlement.
-
-Useful primary documentation:
-
-- [Frankfurter overview](https://frankfurter.dev/)
+- [Frankfurter overview and FAQ](https://frankfurter.dev/)
 - [Frankfurter license and provider terms](https://frankfurter.dev/license/)
 - [Frankfurter API reference](https://api.frankfurter.dev/v2/openapi.json)
-- [EIA WTI and Brent daily spot prices](https://www.eia.gov/dnav/pet/PET_PRI_SPT_S1_D.htm)
-- [EIA API documentation and key registration](https://www.eia.gov/opendata/documentation.php)
+- [ECB reference rates: timing and transaction-use notice](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html)
+- [EIA WTI and Brent daily spot prices](https://www.eia.gov/dnav/pet/pet_pri_spt_s1_d.htm)
 - [EIA copyrights and reuse](https://www.eia.gov/about/copyrights_reuse.php)
-- [Twelve Data time-series API documentation](https://twelvedata.com/docs)
-- [Twelve Data Forex API coverage, intervals and metals](https://support.twelvedata.com/en/articles/12520817-forex-api-v2)
-- [Twelve Data business plans and external display](https://twelvedata.com/pricing-business)
-- [Twelve Data commercial and personal use](https://support.twelvedata.com/en/articles/5332349-commercial-and-personal-usage)
-- [Twelve Data terms of use](https://twelvedata.com/terms)
-- [Twelve Data public attribution rules](https://support.twelvedata.com/en/articles/12647398-attribution-guidelines-for-using-twelve-data)
-- [ECB rate timing and transaction-use notice](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html)
+- [EIA API documentation and key registration](https://www.eia.gov/opendata/documentation.php)
+- [FRED terms of use](https://fred.stlouisfed.org/docs/api/terms_of_use.html)
