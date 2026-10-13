@@ -1,5 +1,5 @@
 # How `npm run dist` packages the desktop app. Options: https://www.electron.build/configuration
-appId: io.github.shahin-h2.counterline-fx-desk
+appId: com.shahinhassanyan.counterline-fx-desk
 productName: Counterline FX Desk
 directories:
   output: dist
