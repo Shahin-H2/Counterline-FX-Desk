@@ -58,21 +58,23 @@ function paintStars(canvas, { seed, area, colours, alpha, haloChance }) {
   }
 }
 
-export function createCosmos({ backdrop, sidebar }) {
+export function createCosmos({ backdrop, sidebar = null }) {
   const far = backdrop.querySelector(".cosmos-stars-far");
   const near = backdrop.querySelector(".cosmos-stars-near");
   // The sidebar is dark in both themes, so it always carries a night sky of its own.
-  const side = document.createElement("canvas");
-  side.className = "sidebar-stars";
-  side.setAttribute("aria-hidden", "true");
-  sidebar.prepend(side);
+  const side = sidebar ? document.createElement("canvas") : null;
+  if (side) {
+    side.className = "sidebar-stars";
+    side.setAttribute("aria-hidden", "true");
+    sidebar.prepend(side);
+  }
   let night = false;
 
   function paint() {
     const colours = night ? STAR_COLOURS.night : STAR_COLOURS.day;
     paintStars(far, { seed: 11, area: night ? 2600 : 5200, colours, alpha: night ? 0.85 : 0.34, haloChance: 0 });
     paintStars(near, { seed: 29, area: night ? 26000 : 42000, colours, alpha: night ? 1 : 0.5, haloChance: 1 });
-    paintStars(side, { seed: 47, area: 2100, colours: STAR_COLOURS.night, alpha: 0.62, haloChance: 0.05 });
+    if (side) paintStars(side, { seed: 47, area: 2100, colours: STAR_COLOURS.night, alpha: 0.62, haloChance: 0.05 });
   }
 
   let resizeTimer = 0;
