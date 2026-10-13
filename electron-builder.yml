@@ -3,9 +3,11 @@ appId: io.github.shahin-h2.counterline-fx-desk
 productName: Counterline FX Desk
 directories:
   output: dist
+# The app does not update itself, so no update feed is written into it or beside the installers.
+publish: null
 
 # Only what the app runs on goes into an installer. Everything else in this folder stays out of
-# it, including .env, the tests and the notes.
+# it, including .env and the tests.
 files:
   - package.json
   - server.mjs
@@ -18,6 +20,10 @@ files:
 mac:
   category: public.app-category.finance
   icon: build/icon-mac.png
+  # No Apple Developer ID yet, so the app gets a local ("ad-hoc") signature. Without one, macOS
+  # tells whoever downloads the app that it is damaged; with one, it offers "Open Anyway".
+  # Delete this line once a Developer ID certificate is set up, and the build will use that.
+  identity: "-"
   artifactName: Counterline-FX-Desk-${version}-mac.${ext}
   target:
     # One download for both Apple silicon and Intel Macs.
