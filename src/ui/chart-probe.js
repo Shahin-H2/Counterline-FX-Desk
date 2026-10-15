@@ -27,7 +27,7 @@ export function createChartProbe({
   let active = null; // the card whose read-out is showing
 
   function hide() {
-    active?.classList.remove("is-probing");
+    active?.classList.remove("is-probing"); // 
     active = null;
   }
 
