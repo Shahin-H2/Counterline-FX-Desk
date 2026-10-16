@@ -1,4 +1,8 @@
-// Copyright 2024 Counterline, Inc. All rights reserved.
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
+// Workspace page: the rates board, desk prices, calculator, history charts and market cards.
+// Market data comes from the local /api endpoints; the desk's settings are kept in localStorage.
+
 import {
   compareDecimals,
   decimalFromNumber,
@@ -15,7 +19,11 @@ import { createCardReorder, slide } from "./ui/card-reorder.js";
 import { createChartProbe } from "./ui/chart-probe.js";
 import { createCosmos } from "./ui/cosmos.js";
 
-// Storage keys
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+// localStorage keys. The version suffix lets a later format change start from clean storage.
 const STORAGE_KEY = "counterline-fx-prices-v1";
 const REFERENCE_CACHE_KEY = "counterline-fx-reference-cache-v1";
 const CURRENCY_CACHE_KEY = "counterline-fx-currencies-v1";
@@ -42,68 +50,72 @@ const DEFAULT_PAIRS = [
   "USD/JPY",
   "USD/CHF",
 ];
+// The reference feed quotes the metals against USD only (see isSupportedPair).
 const METAL_ASSETS = [
   { code: "XAU", name: "Gold (troy ounce)", symbol: "Au" },
   { code: "XAG", name: "Silver (troy ounce)", symbol: "Ag" },
-]; // These are the only two metals supported for reference rates, and they must be paired with USD.
+];
 const METAL_CODES = new Set(METAL_ASSETS.map(({ code }) => code));
 const MAX_BOARD_PAIRS = 30;
 const MANUAL_RATE_PATTERN = /^\d+(?:\.\d{1,8})?$/;
 const MARGIN_PATTERN = /^\d{1,2}(?:\.\d{1,2})?$/;
 const locale = navigator.language || "en-US";
 
-// DOM elements
+// ---------------------------------------------------------------------------
+// DOM references
+// ---------------------------------------------------------------------------
+
 const elements = {
-  ratesBody: document.querySelector("#rates-body"), // tbody for the main rate board
-  pairTotal: document.querySelector("#pair-total"), // total count of pairs on the board
-  navPairCount: document.querySelector("#nav-pair-count"), // total count of pairs in the navigation bar
-  feedPill: document.querySelector("#feed-pill"), // the status indicator in the navigation bar
-  rateDate: document.querySelector("#rate-date"), // the date of the most recent reference observation
-  checkedAt: document.querySelector("#checked-at"), // the time the reference feed was last checked
-  feedAlert: document.querySelector("#feed-alert"), // the alert box for feed issues
-  sidebarFeedStatus: document.querySelector("#sidebar-feed-status"), // the text in the sidebar showing the feed status
-  refreshButton: document.querySelector("#refresh-button"), // the button to refresh the reference feed
-  searchInput: document.querySelector("#search-input"), // the input for searching pairs
-  emptySearch: document.querySelector("#empty-search"), // the empty state message when no pairs match the search/filter
-  optionsToggle: document.querySelector("#display-options-toggle"), // the button to toggle the display options panel
-  displayOptions: document.querySelector("#display-options"), // the panel containing display options
-  pairFilter: document.querySelector("#pair-filter"), // the select input for filtering pairs
-  pairSort: document.querySelector("#pair-sort"), // the select input for sorting pairs
-  boardDensity: document.querySelector("#board-density"), // the select input for changing the density of the board
-  boardTheme: document.querySelector("#board-theme"), // the select input for changing the theme of the board
+  ratesBody: document.querySelector("#rates-body"),
+  pairTotal: document.querySelector("#pair-total"),
+  navPairCount: document.querySelector("#nav-pair-count"),
+  feedPill: document.querySelector("#feed-pill"),
+  rateDate: document.querySelector("#rate-date"),
+  checkedAt: document.querySelector("#checked-at"),
+  feedAlert: document.querySelector("#feed-alert"),
+  sidebarFeedStatus: document.querySelector("#sidebar-feed-status"),
+  refreshButton: document.querySelector("#refresh-button"),
+  searchInput: document.querySelector("#search-input"),
+  emptySearch: document.querySelector("#empty-search"),
+  optionsToggle: document.querySelector("#display-options-toggle"),
+  displayOptions: document.querySelector("#display-options"),
+  pairFilter: document.querySelector("#pair-filter"),
+  pairSort: document.querySelector("#pair-sort"),
+  boardDensity: document.querySelector("#board-density"),
+  boardTheme: document.querySelector("#board-theme"),
   themeToggle: document.querySelector("#theme-toggle"),
   themeToggleLabel: document.querySelector("#theme-toggle-label"),
-  resetDisplayOptions: document.querySelector("#reset-display-options"), // the button to reset display options to default
-  pairDialog: document.querySelector("#pair-dialog"), // the dialog for adding a new pair
-  pairForm: document.querySelector("#pair-form"), // the form inside the pair dialog
-  pairBase: document.querySelector("#pair-base"), // the input for the base currency in the pair dialog
-  pairQuote: document.querySelector("#pair-quote"), // the input for the quote currency in the pair dialog
-  pairPreview: document.querySelector("#pair-preview"), // the preview of the pair in the pair dialog
-  priceDialog: document.querySelector("#price-dialog"), // the dialog for setting prices
-  priceForm: document.querySelector("#price-form"), // the form inside the price dialog
-  pricePairId: document.querySelector("#price-pair-id"), // the hidden input for the pair ID in the price dialog
-  priceDialogTitle: document.querySelector("#price-dialog-title"), // the title of the price dialog
-  priceDialogDescription: document.querySelector("#price-dialog-description"), // the description of the price dialog
-  priceBuy: document.querySelector("#price-buy"), // the input for the buy price in the price dialog
-  priceSell: document.querySelector("#price-sell"), // the input for the sell price in the price dialog
-  priceReferenceRate: document.querySelector("#price-reference-rate"), // the element showing the reference rate in the price dialog
-  priceReferenceDate: document.querySelector("#price-reference-date"), // the element showing the reference date in the price dialog
-  priceValidation: document.querySelector("#price-validation"), // the element showing validation messages in the price dialog
-  calculatorBase: document.querySelector("#calculator-base"), // the select input for the base currency in the calculator
-  calculatorQuote: document.querySelector("#calculator-quote"), // the select input for the quote currency in the calculator
-  swapCurrencies: document.querySelector("#swap-currencies"), // the button to swap the base and quote currencies in the calculator
-  calculatorBaseCode: document.querySelector("#calculator-base-code"), // the element showing the base currency code in the calculator
-  calculatorAmount: document.querySelector("#calculator-amount"), // the input for the amount in the calculator
+  resetDisplayOptions: document.querySelector("#reset-display-options"),
+  pairDialog: document.querySelector("#pair-dialog"),
+  pairForm: document.querySelector("#pair-form"),
+  pairBase: document.querySelector("#pair-base"),
+  pairQuote: document.querySelector("#pair-quote"),
+  pairPreview: document.querySelector("#pair-preview"),
+  priceDialog: document.querySelector("#price-dialog"),
+  priceForm: document.querySelector("#price-form"),
+  pricePairId: document.querySelector("#price-pair-id"),
+  priceDialogTitle: document.querySelector("#price-dialog-title"),
+  priceDialogDescription: document.querySelector("#price-dialog-description"),
+  priceBuy: document.querySelector("#price-buy"),
+  priceSell: document.querySelector("#price-sell"),
+  priceReferenceRate: document.querySelector("#price-reference-rate"),
+  priceReferenceDate: document.querySelector("#price-reference-date"),
+  priceValidation: document.querySelector("#price-validation"),
+  calculatorBase: document.querySelector("#calculator-base"),
+  calculatorQuote: document.querySelector("#calculator-quote"),
+  swapCurrencies: document.querySelector("#swap-currencies"),
+  calculatorBaseCode: document.querySelector("#calculator-base-code"),
+  calculatorAmount: document.querySelector("#calculator-amount"),
   calculatorReferenceResult: document.querySelector(
     "#calculator-reference-result",
-  ), // the element showing the reference result in the calculator
-  calculatorReferenceMeta: document.querySelector("#calculator-reference-meta"), // the element showing the reference meta information in the calculator
-  calculatorBuyResult: document.querySelector("#calculator-buy-result"), // the element showing the buy result in the calculator
-  calculatorSellResult: document.querySelector("#calculator-sell-result"), // the element showing the sell result in the calculator
-  calculatorAddPair: document.querySelector("#calculator-add-pair"), // the button to add the calculator pair to the board
-  historyGrid: document.querySelector("#history-grid"), // the container for the history charts
-  historyStatus: document.querySelector("#history-status"), // the element showing the status of the history loading
-  historyRanges: document.querySelector(".history-controls"), // the container for the history range buttons
+  ),
+  calculatorReferenceMeta: document.querySelector("#calculator-reference-meta"),
+  calculatorBuyResult: document.querySelector("#calculator-buy-result"),
+  calculatorSellResult: document.querySelector("#calculator-sell-result"),
+  calculatorAddPair: document.querySelector("#calculator-add-pair"),
+  historyGrid: document.querySelector("#history-grid"),
+  historyStatus: document.querySelector("#history-status"),
+  historyRanges: document.querySelector(".history-controls"),
   marketHistoryGrid: document.querySelector("#market-history-grid"),
   marketHistoryStatus: document.querySelector("#market-history-status"),
   marketHistoryRanges: document.querySelector(".market-history-controls"),
@@ -119,10 +131,14 @@ const elements = {
   priceMargin: document.querySelector("#price-margin"),
   applyMargin: document.querySelector("#apply-margin"),
   marginPreview: document.querySelector("#margin-preview"),
-  announcements: document.querySelector("#announcements"), // the live region for announcing changes to screen readers
+  announcements: document.querySelector("#announcements"),
 };
 
-// Utility functions
+// ---------------------------------------------------------------------------
+// Saved settings
+// ---------------------------------------------------------------------------
+
+// Reads a JSON value from localStorage; `fallback` when it is missing, unreadable or blocked.
 function readJson(key, fallback) {
   try {
     const value = localStorage.getItem(key);
@@ -132,6 +148,7 @@ function readJson(key, fallback) {
   }
 }
 
+// A saved card order, limited to the ids still shown, with any new ids appended in order.
 function reconcileChartOrder(savedOrder, visibleIds) {
   const allowed = new Set(visibleIds);
   const order = Array.isArray(savedOrder)
@@ -140,7 +157,7 @@ function reconcileChartOrder(savedOrder, visibleIds) {
   return [...order, ...visibleIds.filter((id) => !order.includes(id))];
 }
 
-// Validate that a pair ID is in the correct format (e.g., "USD/EUR") and that the base and quote currencies are not the same.
+// "BASE/QUOTE": two different three-letter codes.
 function validPairId(value) {
   return (
     typeof value === "string" &&
@@ -149,7 +166,8 @@ function validPairId(value) {
   );
 }
 
-// Load settings from localStorage, ensuring that the pairs and prices are valid and within the allowed limits.
+// The saved board and desk prices. Malformed entries are dropped and the board is capped at
+// MAX_BOARD_PAIRS.
 function loadSettings() {
   const saved = readJson(STORAGE_KEY, null);
   if (!saved || typeof saved !== "object")
@@ -185,7 +203,10 @@ function loadSettings() {
   return { pairs, prices };
 }
 
-// Initialize application state
+// ---------------------------------------------------------------------------
+// Application state
+// ---------------------------------------------------------------------------
+
 const settings = loadSettings();
 const savedView = readJson(VIEW_STORAGE_KEY, {}) ?? {};
 const view = {
@@ -211,7 +232,7 @@ const view = {
   quoteCardSort: CARD_SORTS.includes(savedView.quoteCardSort) ? savedView.quoteCardSort : DEFAULT_VIEW.quoteCardSort,
   // The margin last used to fill desk prices from the reference, in percent.
   marginPercent: MARGIN_PATTERN.test(String(savedView.marginPercent)) ? String(savedView.marginPercent) : DEFAULT_VIEW.marginPercent,
-}; // The view settings control how the board is displayed, including filtering, sorting, density, and theme.
+};
 let referenceRates = {};
 let referenceMeta = {
   cacheStatus: "loading",
@@ -224,8 +245,8 @@ let searchTerm = "";
 let hasAnimatedRows = false;
 const calculatorLookupState = new Map();
 let previousCalculatorSelection = { base: "USD", quote: "EUR" };
-// Each chart grid keeps the range on show, the series the server returned for it, and what the
-// server said about every series: reference, stale or estimated.
+// Per chart grid: the selected range, the series returned for it, and the server's label for
+// each series (reference, stale or estimated).
 const newChartState = () => ({
   range: "1m",
   data: {},
@@ -274,17 +295,21 @@ let marketQuotes = {}; // asset code -> the quote shown on its card
 let pairHistoryOrder = reconcileChartOrder(readJson(PAIR_HISTORY_ORDER_KEY, []), settings.pairs);
 let marketHistoryOrder = reconcileChartOrder(readJson(METAL_HISTORY_ORDER_KEY, []), MARKET_HISTORY_ASSETS.map(({ code }) => code));
 
-// Helper functions
+// ---------------------------------------------------------------------------
+// Currencies and formatting
+// ---------------------------------------------------------------------------
+
 function pairParts(id) {
   const [base, quote] = id.split("/");
   return { base, quote };
 }
 
-// Get the full name of a currency given its code, or return the code if not found.
+// Full currency name, or the code when the currency list has no entry for it.
 function currencyName(code) {
   return currencies.find((currency) => currency.code === code)?.name ?? code;
 }
 
+// Two-letter mark for a pair's chip; the metals use their chemical symbols.
 function currencyMark(code) {
   return (
     METAL_ASSETS.find((asset) => asset.code === code)?.symbol ??
@@ -292,12 +317,11 @@ function currencyMark(code) {
   );
 }
 
-// Check if either the base or quote currency is a metal (gold or silver).
 function isMetalPair(base, quote) {
   return METAL_CODES.has(base) || METAL_CODES.has(quote);
 }
 
-// Check if a currency pair is supported for reference rates. Gold and silver pairs must be paired with USD.
+// The reference feed quotes gold and silver against USD only.
 function isSupportedPair(base, quote) {
   if (!isMetalPair(base, quote)) return true;
   return (
@@ -306,7 +330,7 @@ function isSupportedPair(base, quote) {
   );
 }
 
-// Return a human-readable description of the unit for a metal pair, or a generic message if not applicable.
+// Unit line for a metal pair.
 function metalPairUnit(base, quote) {
   if (base === "USD" && quote === "XAU") return "Troy ounces of gold per USD";
   if (base === "USD" && quote === "XAG") return "Troy ounces of silver per USD";
@@ -315,7 +339,7 @@ function metalPairUnit(base, quote) {
   return "Gold and silver pairs use USD";
 }
 
-// Ensure that the list of currencies includes USD, IRR, and the supported metal assets (XAU and XAG).
+// USD, IRR and the metals are always selectable, whatever the currency list contains.
 function ensureSpecialAssets(list) {
   const next = list.filter((currency) => !METAL_CODES.has(currency.code));
   if (!next.some((currency) => currency.code === "USD"))
@@ -329,7 +353,7 @@ function ensureSpecialAssets(list) {
   return next;
 }
 
-// Escape HTML special characters in a string to prevent XSS vulnerabilities when rendering user-provided content.
+// Escapes text for interpolation into HTML markup.
 function escapeHtml(value) {
   return String(value).replace(
     /[&<>"']/g,
@@ -340,7 +364,8 @@ function escapeHtml(value) {
   );
 }
 
-// Format a date string (YYYY-MM-DD) into a human-readable format based on the user's locale and specified options.
+// A YYYY-MM-DD date (taken as a calendar date, not a moment) or a timestamp, in the viewer's
+// locale.
 function formatDate(
   dateString,
   options = {
@@ -358,6 +383,7 @@ function formatDate(
   return new Intl.DateTimeFormat(locale, options).format(date);
 }
 
+// Axis labels: dates on daily ranges, times on the intraday ones.
 function formatHistoryAxis(value, range) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return formatDate(value, { month: "short", day: "numeric", timeZone: "UTC" });
@@ -370,6 +396,7 @@ function formatHistoryAxis(value, range) {
   return new Intl.DateTimeFormat(locale, options).format(new Date(value));
 }
 
+// Read-out label: the date for a daily point, date and time for an intraday one.
 function formatHistoryTooltip(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Date unavailable";
@@ -378,7 +405,6 @@ function formatHistoryTooltip(value) {
     : new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
 }
 
-// Format the time when the reference feed was last checked, or return a default message if unavailable.
 function formatCheckedAt(value) {
   if (!value || Number.isNaN(new Date(value).getTime()))
     return "Check time unavailable";
@@ -388,7 +414,7 @@ function formatCheckedAt(value) {
   }).format(new Date(value));
 }
 
-// Format the observed date and time of a reference rate, or fall back to the date if the observed time is unavailable.
+// Observation time when the source gives one, otherwise the observation date.
 function formatRateObservation(
   rate,
   dateOptions = { month: "short", day: "numeric", timeZone: "UTC" },
@@ -409,7 +435,7 @@ function formatRateObservation(
   return formatDate(rate?.date, options);
 }
 
-// Format a currency pair rate to a string with a specified number of decimal places, ensuring that it is displayed in a user-friendly format.
+// Rates are shown with 2 to 8 decimals.
 function formatPairRate(rate) {
   return formatDecimal(rate, locale, 2, 8);
 }
@@ -420,6 +446,10 @@ function formatPairRate(rate) {
 function formatChartValue(value) {
   return formatPairRate(decimalFromNumber(value, 6) ?? "");
 }
+
+// ---------------------------------------------------------------------------
+// History charts
+// ---------------------------------------------------------------------------
 
 // Builds one chart card: its state, its classes and the markup that goes inside it. The card
 // element itself is kept between renders (see renderHistoryCards).
@@ -458,7 +488,7 @@ function historyCardView(id, observations, series, cardIndex, { market = false, 
   const kind = SERIES_KINDS.has(series?.kind) ? series.kind : "reference";
   const estimated = kind === "estimated";
   const stale = kind === "stale";
-  // Calculate the dimensions and coordinates for the chart, including the min/max values, padding, and scaling for the SVG elements.
+  // Geometry: the observed range, padded, scaled into the plot area of a 340 x 155 viewBox.
   const width = 340;
   const height = 155;
   const plot = { left: 54, right: 334, top: 10, bottom: 121 };
@@ -478,7 +508,7 @@ function historyCardView(id, observations, series, cardIndex, { market = false, 
         ? (plot.left + plot.right) / 2
         : plot.left + ((plot.right - plot.left) * index) / (points.length - 1),
     y: plot.bottom - ((point.value - low) / span) * (plot.bottom - plot.top),
-  })); // Map each data point to its x and y coordinates within the SVG plot area.
+  }));
   const line = coords
     .map(
       (point, index) =>
@@ -492,7 +522,7 @@ function historyCardView(id, observations, series, cardIndex, { market = false, 
       const y = plot.top + ((plot.bottom - plot.top) * index) / 2;
       return `<g class="history-gridline"><line x1="${plot.left}" y1="${y.toFixed(2)}" x2="${plot.right}" y2="${y.toFixed(2)}"/><text x="${plot.left - 7}" y="${(y + 3.5).toFixed(2)}" text-anchor="end">${escapeHtml(formatChartValue(value))}</text></g>`;
     })
-    .join(""); // The horizontal grid lines with their max, mid and min labels.
+    .join("");
   // A short series gets a marker on every point; on a long one they would merge into a band.
   const dots = points.length > 40
     ? ""
@@ -719,6 +749,7 @@ function loadPairHistory() {
   });
 }
 
+// Load the history charts for gold, silver, WTI and Brent.
 function loadMarketHistory() {
   return loadCharts(marketCharts, {
     ids: MARKET_HISTORY_ASSETS.map(({ code }) => code),
@@ -729,6 +760,10 @@ function loadMarketHistory() {
     emptyMessage: "",
   });
 }
+
+// ---------------------------------------------------------------------------
+// Market cards
+// ---------------------------------------------------------------------------
 
 function formatUsdPrice(value) {
   return new Intl.NumberFormat(locale, {
@@ -813,7 +848,11 @@ async function loadMarketQuotes() {
   renderMarketHistory();
 }
 
-// Determine the number of decimal places to display for a given currency code, using the Intl.NumberFormat API to get the maximum fraction digits for that currency. If the currency is a metal (gold or silver), return 8 decimal places. If the currency code is invalid or not supported, default to 2 decimal places.
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+// Fraction digits for an amount in a currency, as Intl reports them; metals use 8.
 function amountDigits(code) {
   if (METAL_CODES.has(code)) return 8;
   try {
@@ -827,12 +866,12 @@ function amountDigits(code) {
   }
 }
 
-// Save the current settings (pairs and prices) to localStorage, returning true if successful or false if an error occurs.
 function saveSettings() {
   return writeJson(STORAGE_KEY, settings);
 }
 
-// Save the current reference cache to localStorage, returning true if successful or false if an error occurs.
+// Returns false when localStorage is full or blocked, so that callers can say a change only
+// lasts for this session.
 function writeJson(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -842,7 +881,8 @@ function writeJson(key, value) {
   }
 }
 
-// Announce a message to screen readers by clearing the live region and then setting the text content after a short delay, ensuring that the message is read aloud.
+// Screen reader announcement. The live region is cleared first so that a repeated message is
+// read again.
 function announce(message) {
   elements.announcements.textContent = "";
   window.setTimeout(() => {
@@ -855,18 +895,22 @@ function catchLight() {
   const title = document.querySelector("h1");
   if (!title) return;
   title.classList.remove("is-catching-light");
-  void title.offsetWidth; // so that adding the class again restarts the animation
+  void title.offsetWidth; // Reflow, so that re-adding the class restarts the animation.
   title.classList.add("is-catching-light");
 }
 
-// Update the feed status pill in the navigation bar and sidebar with the given label and state, reflecting the current status of the reference feed.
+// ---------------------------------------------------------------------------
+// Reference feed status
+// ---------------------------------------------------------------------------
+
+// The feed pill in the header and its copy in the sidebar.
 function setFeedPill(label, state) {
   elements.feedPill.dataset.state = state;
   elements.feedPill.innerHTML = `<span class="status-dot"></span><span>${escapeHtml(label)}</span>`;
   elements.sidebarFeedStatus.textContent = label;
 }
 
-// Get the list of currency pairs that have stale reference observations, defined as being older than 3 calendar days from today.
+// Board pairs whose reference observation is past the stale threshold (domain/freshness.js).
 function currentStalePairs() {
   const today = new Date();
   return settings.pairs.filter((id) => {
@@ -875,7 +919,7 @@ function currentStalePairs() {
   });
 }
 
-// Update the feed status based on the current reference rates, cache status, and any errors or missing pairs. This function determines the appropriate label and state for the feed pill, updates the rate date and checked at information, and displays any relevant alerts to the user.
+// Updates the feed pill, the rate date line and the alert banner from the reference data.
 function updateFeedStatus() {
   const boardRates = settings.pairs
     .map((id) => referenceRates[id])
@@ -887,7 +931,7 @@ function updateFeedStatus() {
   let label = "Live lookup";
   let state = "fresh";
 
-  // Determine the appropriate label and state for the feed pill based on the availability of rates, cache status, and any errors or missing pairs.
+  // Pill label and state, most serious condition first.
   if (!ratesAvailable) {
     label =
       referenceMeta.cacheStatus === "error" || hasErrors
@@ -919,7 +963,6 @@ function updateFeedStatus() {
     state = "fresh";
   }
 
-  // Update the feed pill in the navigation bar and sidebar with the determined label and state.
   setFeedPill(label, state);
   if (!ratesAvailable) {
     elements.rateDate.textContent = "No reference data";
@@ -927,7 +970,7 @@ function updateFeedStatus() {
       ? `Last checked ${formatCheckedAt(referenceMeta.checkedAt)}`
       : "Waiting for the first provider response";
   } else {
-    // If rates are available, determine the latest observation date and update the rate date and checked at information accordingly.
+    // The newest observation date among the board's rates.
     const dates = boardRates
       .map((rate) => rate.date)
       .filter(Boolean)
@@ -939,7 +982,7 @@ function updateFeedStatus() {
     elements.checkedAt.textContent = `${referenceMeta.cacheStatus === "stale-cache" ? "Last successful fetch" : "Checked"} ${formatCheckedAt(referenceMeta.cacheStatus === "stale-cache" ? referenceMeta.retrievedAt : referenceMeta.checkedAt)} · pair dates shown below`;
   }
 
-  // Determine the appropriate alert message and kind based on the current state of the reference rates, cache status, and any errors or missing pairs. This message will be displayed to the user in the feed alert area.
+  // Alert banner text for the current condition, if any.
   let alertText = "";
   let alertKind = "warning";
   if (!ratesAvailable) {
@@ -958,15 +1001,18 @@ function updateFeedStatus() {
     alertText = `One or more reference observations are more than ${3} calendar days old. Stale pairs are marked in the table; do not present them as current.`;
   } else if (hasErrors || missingPairs.length) {
     alertText = `Partial reference coverage: ${missingPairs.length} pair${missingPairs.length === 1 ? " has" : "s have"} no returned rate. Missing rows are labeled individually.`;
-  } // Update the feed alert area with the determined alert message and kind, showing or hiding it based on whether there is an alert to display.
+  }
   elements.feedAlert.hidden = !alertText;
   elements.feedAlert.dataset.kind = alertKind;
   elements.feedAlert.textContent = alertText;
 }
 
-// Render the price text for a given price and quote currency, returning a span element with the formatted price or a placeholder if the price is not available.
-// `margin` is the desk's margin against the reference in percent; a negative one means the price
-// sits on the losing side of the reference, which `warning` spells out.
+// ---------------------------------------------------------------------------
+// Rates board
+// ---------------------------------------------------------------------------
+
+// Markup for a desk price and its margin badge. `margin` is in percent of the reference; a
+// negative margin means the price is on the losing side, which `warning` explains on hover.
 function priceText(price, quote, className = "", margin = null, warning = "") {
   if (!price) return `<span class="price-readout ${className}">—</span>`;
   const badge = margin === null
@@ -975,12 +1021,12 @@ function priceText(price, quote, className = "", margin = null, warning = "") {
   return `<span class="price-stack"><span class="price-readout ${className}">${escapeHtml(formatPairRate(price))} <small>${escapeHtml(quote)}</small></span>${badge}</span>`;
 }
 
-// How a pair's desk prices sit against its reference rate, and whether they need a look.
+// Margins of a pair's desk prices against its reference rate, and any issues to review.
 function reviewFor(id) {
   return reviewDeskPrice({ reference: referenceRates[id]?.rate, ...(settings.prices[id] ?? {}) });
 }
 
-// Render the main table of currency pairs, including their reference rates, customer prices, and any relevant status indicators. This function handles filtering, sorting, and displaying the appropriate messages when no pairs match the current search or filter criteria.
+// Renders the rates board: filters and sorts the pairs, then writes one row per visible pair.
 function renderTable({
   animateRows = false,
   animatePair = null,
@@ -1004,7 +1050,7 @@ function renderTable({
     return;
   }
 
-  // Filter the list of currency pairs based on the current search term and view filter, returning only those pairs that match the criteria.
+  // Search text and the selected filter.
   const normalizedSearch = searchTerm.trim().toLocaleLowerCase(locale);
   const visiblePairs = settings.pairs.filter((id) => {
     const { base, quote } = pairParts(id);
@@ -1028,7 +1074,8 @@ function renderTable({
     }
     if (view.filter === "review" && !reviewFor(id).issues.length) return false;
     return true;
-  }); // Sort the visible pairs based on the current view sort option, using different criteria for code, name, and rate sorting.
+  });
+  // "board" keeps the saved order; the other sorts work on a copy.
   const sortedPairs = [...visiblePairs];
   if (view.sort === "code") sortedPairs.sort((a, b) => a.localeCompare(b));
   if (view.sort === "name")
@@ -1039,7 +1086,7 @@ function renderTable({
         `${currencyName(bParts.base)} ${currencyName(bParts.quote)}`,
         locale,
       );
-    }); // Sort by the full currency names for the base and quote currencies.
+    });
   if (view.sort === "rate-high" || view.sort === "rate-low")
     sortedPairs.sort((a, b) => {
       const aRate = referenceRates[a]?.rate;
@@ -1049,7 +1096,8 @@ function renderTable({
       if (!bRate) return -1;
       const order = compareDecimals(aRate, bRate);
       return view.sort === "rate-high" ? -order : order;
-    }); // Sort by the reference rate, handling cases where one or both rates may be missing.
+    });
+  // Empty state, worded for a search or for a filter.
   elements.emptySearch.hidden = sortedPairs.length > 0;
   if (!sortedPairs.length) {
     const title = elements.emptySearch.querySelector("strong");
@@ -1065,11 +1113,11 @@ function renderTable({
           ? "Adjust the filter or add prices to see more pairs."
           : "Try a currency code or name.";
     }
-  } // If there are no visible pairs after filtering and sorting, clear the rates table. Otherwise, generate the HTML for each visible pair, including its reference rate, customer prices, and action buttons for editing, moving, flipping, or removing the pair.
+  }
   if (!visiblePairs.length) {
     elements.ratesBody.innerHTML = "";
   } else {
-    // Generate the HTML for each visible pair, including its reference rate, customer prices, and action buttons for editing, moving, flipping, or removing the pair.
+    // One row per pair: reference rate, desk prices with their margins, and the row actions.
     elements.ratesBody.innerHTML = sortedPairs
       .map((id, index) => {
         const { base, quote } = pairParts(id);
@@ -1118,13 +1166,17 @@ function renderTable({
       })
       .join("");
   }
-  if (animateRows) hasAnimatedRows = true; // Mark that the initial row animation has completed to prevent re-animating rows on subsequent renders.
+  if (animateRows) hasAnimatedRows = true;
   updateFeedStatus();
   renderCalculatorOptions();
   renderPairHistory();
 }
 
-// Read the reference cache from localStorage, validating its structure and contents. If the cache is valid, return an object containing the cached rates and metadata; otherwise, return null.
+// ---------------------------------------------------------------------------
+// Reference data
+// ---------------------------------------------------------------------------
+
+// The last reference rates saved in this browser, validated, or null.
 function readReferenceCache() {
   const cached = readJson(REFERENCE_CACHE_KEY, null);
   if (
@@ -1147,7 +1199,7 @@ function readReferenceCache() {
   return Object.keys(rates).length ? { ...cached, rates } : null;
 }
 
-// Load the list of supported currencies from the server, filtering out any invalid entries and ensuring that special assets (like gold and silver) are included. If the fetch fails, fall back to a cached version if available.
+// Loads the currency list, falling back to the copy saved after the last successful load.
 async function loadCurrencies() {
   try {
     const response = await fetch("/api/currencies");
@@ -1175,7 +1227,8 @@ async function loadCurrencies() {
     refreshCalculatorReference(selectedPair);
 }
 
-// Load the reference rates for the current pairs from the server, updating the UI with loading states, errors, and the resulting data. If the fetch fails, fall back to a cached version if available.
+// Loads reference rates for the board. A pair the server leaves out keeps its previous rate,
+// flagged as a cache fallback, and the board then reports partial coverage.
 async function loadRates({ announceSuccess = false } = {}) {
   const pairs = settings.pairs.map(pairParts);
   if (!pairs.length) return;
@@ -1252,7 +1305,11 @@ async function loadRates({ announceSuccess = false } = {}) {
   }
 }
 
-// Render the options for the calculator's base and quote currency selectors, ensuring that all currencies in the current pairs and any special assets are included. The previously selected currencies are preserved if still available; otherwise, defaults are chosen based on the first pair or the first available option.
+// ---------------------------------------------------------------------------
+// Calculator
+// ---------------------------------------------------------------------------
+
+// Fills both calculator selects, keeping the current selection while it is still available.
 function renderCalculatorOptions() {
   const previousBase = elements.calculatorBase.value;
   const previousQuote = elements.calculatorQuote.value;
@@ -1306,14 +1363,14 @@ function renderCalculatorOptions() {
   renderCalculator();
 }
 
-// Get the currently selected calculator pair as a string in the format "BASE/QUOTE", or return an empty string if the selection is invalid (e.g., if the base and quote are the same or not selected).
+// The calculator's pair as "BASE/QUOTE", or "" unless base and quote are two different codes.
 function currentCalculatorPair() {
   const base = elements.calculatorBase.value;
   const quote = elements.calculatorQuote.value;
   return base && quote && base !== quote ? `${base}/${quote}` : "";
 }
 
-// Render the calculator results based on the currently selected base and quote currencies, the entered amount, and the available reference rates and customer prices. This function updates the UI with the calculated results or appropriate messages if data is missing or invalid.
+// Reference conversion and, for a pair on the board, the amounts at the desk's prices.
 function renderCalculator() {
   const id = currentCalculatorPair();
   if (!id) {
@@ -1327,7 +1384,7 @@ function renderCalculator() {
     elements.calculatorSellResult.textContent = "Choose a pair";
     elements.calculatorAddPair.hidden = true;
     return;
-  } // If the selected pair is invalid (e.g., base and quote are the same), display a message prompting the user to choose two different currencies.
+  }
   const { base, quote } = pairParts(id);
   const metalPair = isMetalPair(base, quote);
   const metalDirectionSupported = isSupportedPair(base, quote);
@@ -1395,7 +1452,8 @@ function renderCalculator() {
   elements.calculatorAddPair.hidden = onBoard;
 }
 
-// Refresh the reference rate for a given currency pair, fetching it from the server if it is not already cached or if a forced refresh is requested. This function updates the lookup state and re-renders the calculator as needed.
+// Looks up the reference rate for a calculator pair; each pair is fetched once unless `force`
+// is set.
 function refreshCalculatorReference(id, { force = false } = {}) {
   if (!id || (!force && calculatorLookupState.has(id))) return;
   const { base, quote } = pairParts(id);
@@ -1403,7 +1461,7 @@ function refreshCalculatorReference(id, { force = false } = {}) {
     calculatorLookupState.set(id, "missing");
     renderCalculator();
     return;
-  } // If the pair is not supported (e.g., gold or silver without USD), mark it as missing and re-render the calculator.
+  }
   calculatorLookupState.set(id, "loading");
   renderCalculator();
   const pair = pairParts(id);
@@ -1414,7 +1472,7 @@ function refreshCalculatorReference(id, { force = false } = {}) {
     .then(async (response) => {
       if (!response.ok) throw new Error("Reference lookup failed");
       return response.json();
-    }) // Validate the response body to ensure it contains the expected structure and data for the requested currency pair.
+    })
     .then((body) => {
       const rate = body.rates?.[id];
       if (rate) {
@@ -1442,14 +1500,15 @@ function refreshCalculatorReference(id, { force = false } = {}) {
         );
       }
       if (currentCalculatorPair() === id) renderCalculator();
-    }) // Handle any errors that occur during the fetch or response processing, marking the lookup state as "cached" or "error" as appropriate, and re-rendering the calculator if the current pair matches the requested pair.
+    })
     .catch(() => {
       calculatorLookupState.set(id, referenceRates[id] ? "cached" : "error");
       if (currentCalculatorPair() === id) renderCalculator();
     });
 }
 
-// Handle changes to the calculator's base or quote currency selectors, ensuring that the two currencies are not the same and updating the calculator results accordingly. If the user selects the same currency for both base and quote, automatically switch the other selector to a different available currency.
+// Keeps base and quote different: choosing the code already on the other side moves that side
+// to its previous code, or to the first other code.
 function changeCalculatorCurrencies(changed) {
   if (elements.calculatorBase.value === elements.calculatorQuote.value) {
     const currenciesAvailable = [...elements.calculatorBase.options].map(
@@ -1470,63 +1529,69 @@ function changeCalculatorCurrencies(changed) {
         : currenciesAvailable.find((code) => code !== currentCode);
     if (changed === "base") elements.calculatorQuote.value = alternate ?? "";
     else elements.calculatorBase.value = alternate ?? "";
-  } // If the user selects the same currency for both base and quote, automatically switch the other selector to a different available currency.
+  }
   previousCalculatorSelection = {
     base: elements.calculatorBase.value,
     quote: elements.calculatorQuote.value,
   };
-  const id = currentCalculatorPair(); // Get the currently selected calculator pair as a string in the format "BASE/QUOTE". If the selection is invalid (e.g., base and quote are the same), exit the function early to prevent further processing.
-  renderCalculator(); // Re-render the calculator results based on the updated base and quote currencies, ensuring that the displayed results reflect the current selection.
-  refreshCalculatorReference(id); // Refresh the reference rate for the currently selected calculator pair, fetching it from the server if it is not already cached or if a forced refresh is requested. This ensures that the calculator displays up-to-date reference rates for the selected pair.
+  const id = currentCalculatorPair();
+  renderCalculator();
+  refreshCalculatorReference(id);
 }
 
-// Add the currently selected calculator pair to the rates board, validating that it is a supported pair and that the board has not reached its maximum capacity. If the pair is successfully added, save the settings and update the UI accordingly.
+// ---------------------------------------------------------------------------
+// Board editing
+// ---------------------------------------------------------------------------
+
+// Adds the calculator's pair to the board.
 function addCalculatorPairToBoard() {
-  const id = currentCalculatorPair(); // Get the currently selected calculator pair as a string in the format "BASE/QUOTE". If the selection is invalid (e.g., base and quote are the same), exit the function early to prevent adding an invalid pair to the board.
-  if (!id || settings.pairs.includes(id)) return; // If the selected pair is invalid or already exists on the board, exit the function early to prevent adding a duplicate or invalid pair.
-  const { base, quote } = pairParts(id); // Extract the base and quote currencies from the selected pair for validation purposes.
+  const id = currentCalculatorPair();
+  if (!id || settings.pairs.includes(id)) return;
+  const { base, quote } = pairParts(id);
   if (!isSupportedPair(base, quote)) {
-    announce("Gold and silver pairs can only be added against USD."); // Announce an error message if the selected pair is not supported.
+    announce("Gold and silver pairs can only be added against USD.");
     return;
-  } // Validate that the selected pair is supported (e.g., gold and silver must be paired with USD) before adding it to the board.
+  }
   if (settings.pairs.length >= MAX_BOARD_PAIRS) {
-    announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`); // Check if the board has reached its maximum capacity before adding the new pair, and announce a message if it has.
+    announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`);
     return;
-  } // Check if the board has reached its maximum capacity before adding the new pair.
-  settings.pairs.push(id); // Add the new pair to the end of the settings.pairs array, which represents the current order of pairs on the board.
-  const saved = saveSettings(); // Save the updated settings to localStorage, returning a boolean indicating whether the save was successful.
-  renderTable({ animatePair: id, highlightPair: id }); // Re-render the table to include the newly added pair, highlighting it for visibility and animating its entry into the board.
-  loadRates(); // Fetch the latest reference rates for the newly added pair, ensuring that the board displays up-to-date information for all pairs, including the one just added.
-  loadPairHistory(); // Refresh the pair history to include the newly added pair, ensuring that the history is up-to-date and reflects the current state of the board.
+  }
+  settings.pairs.push(id);
+  const saved = saveSettings();
+  renderTable({ animatePair: id, highlightPair: id });
+  loadRates();
+  loadPairHistory();
   announce(
     saved
       ? `${id} added to the rates board.`
       : `${id} added for this session; browser storage is unavailable.`,
   );
 }
-// Reorder a currency pair on the board by moving it before or after another specified pair. This function updates the settings, applies view preferences, saves the changes, and re-renders the table. It also manages focus restoration for accessibility.
+
+// Moves a pair before or after another one and switches the board to its saved order.
 function reorderPair(
   sourceId,
   targetId,
   afterTarget = false,
   { restoreFocus = true } = {},
 ) {
-  if (sourceId === targetId) return; // If the source and target pairs are the same, exit the function early to prevent unnecessary reordering.
-  const sourceIndex = settings.pairs.indexOf(sourceId); // Find the index of the source pair in the settings.pairs array. If the source pair is not found, exit the function early to prevent invalid reordering.
-  if (sourceIndex < 0 || !settings.pairs.includes(targetId)) return; // If the source pair is not found or the target pair is not in the current settings, exit the function early to prevent invalid reordering.
-  const [source] = settings.pairs.splice(sourceIndex, 1); // Remove the source pair from its current position in the settings.pairs array, storing it in a variable for later insertion at the new position.
-  let targetIndex = settings.pairs.indexOf(targetId); // Find the index of the target pair in the settings.pairs array. If the target pair is not found, exit the function early to prevent invalid reordering.
-  if (afterTarget) targetIndex += 1; // If the afterTarget flag is true, increment the target index to insert the source pair after the target pair; otherwise, it will be inserted before the target pair.
-  settings.pairs.splice(targetIndex, 0, source); // Move the source pair to the new position in the settings.pairs array, either before or after the target pair based on the afterTarget flag.
-  view.sort = "board"; // Set the view sort order to "board" to reflect the new order of currency pairs after reordering.
-  applyViewPreferences(); // Apply the current view preferences to the document body and relevant UI elements, ensuring that the sort order is set to "board" to reflect the new order of currency pairs after reordering.
-  const saved = saveSettings(); // Save the updated settings to localStorage, returning a boolean indicating whether the save was successful.
-  renderTable(); // Re-render the table to reflect the new order of currency pairs after reordering.
+  if (sourceId === targetId) return;
+  const sourceIndex = settings.pairs.indexOf(sourceId);
+  if (sourceIndex < 0 || !settings.pairs.includes(targetId)) return;
+  const [source] = settings.pairs.splice(sourceIndex, 1);
+  let targetIndex = settings.pairs.indexOf(targetId);
+  if (afterTarget) targetIndex += 1;
+  settings.pairs.splice(targetIndex, 0, source);
+  view.sort = "board";
+  applyViewPreferences();
+  const saved = saveSettings();
+  renderTable();
+  // Keyboard users keep focus on the moved pair.
   if (restoreFocus) {
     const controls = [
       ...elements.ratesBody.querySelectorAll("[data-move-pair]"),
     ].filter((button) => button.dataset.movePair === sourceId);
-    (controls.find((button) => !button.disabled) ?? controls[0])?.focus(); // Restore focus to the first available move control for the moved pair, prioritizing enabled buttons for accessibility.
+    (controls.find((button) => !button.disabled) ?? controls[0])?.focus();
   }
   announce(
     saved
@@ -1535,40 +1600,42 @@ function reorderPair(
   );
 }
 
-// Move a currency pair up or down in the board order, ensuring that the move is valid and within the bounds of the current pairs. This function calls reorderPair to perform the actual reordering.
+// Moves a pair one place up or down the board.
 function movePairInBoard(id, direction) {
-  const index = settings.pairs.indexOf(id); // Find the index of the pair to move in the current settings. If the pair is not found, exit the function early.
-  const targetIndex = index + (direction === "up" ? -1 : 1); // Calculate the target index based on the specified direction (up or down). If the target index is out of bounds, exit the function early.
+  const index = settings.pairs.indexOf(id);
+  const targetIndex = index + (direction === "up" ? -1 : 1);
   if (index < 0 || targetIndex < 0 || targetIndex >= settings.pairs.length)
-    return; // If the pair is not found or the target index is out of bounds, exit the function early to prevent invalid reordering.
-  reorderPair(id, settings.pairs[targetIndex], direction === "down"); // Call reorderPair to move the specified pair before or after the target pair, depending on the direction. This will update the settings, save the changes, and re-render the table.
+    return;
+  reorderPair(id, settings.pairs[targetIndex], direction === "down");
 }
 
-// Flip the direction of a currency pair on the board, changing it from "BASE/QUOTE" to "QUOTE/BASE". This function checks for existing pairs, updates the settings, saves the changes, and re-renders the table. It also updates the calculator if the flipped pair is currently selected.
+// Reverses a pair in place (USD/EUR becomes EUR/USD). Desk prices are never converted; they
+// stay with the direction they were entered for.
 function flipPairDirection(id) {
-  const index = settings.pairs.indexOf(id); // Find the index of the pair to flip in the current settings. If the pair is not found, exit the function early.
-  if (index < 0) return; // If the pair is not found in the current settings, exit the function early to prevent further processing.
-  const { base, quote } = pairParts(id); // Extract the base and quote currencies from the pair ID, which is in the format "BASE/QUOTE". This allows us to construct the flipped pair.
-  const flippedId = `${quote}/${base}`; // Construct the flipped pair ID by reversing the base and quote currencies. This will be used to check for duplicates and update the settings.
+  const index = settings.pairs.indexOf(id);
+  if (index < 0) return;
+  const { base, quote } = pairParts(id);
+  const flippedId = `${quote}/${base}`;
   if (settings.pairs.includes(flippedId)) {
-    announce(`${flippedId} is already on the board.`); // If the flipped pair already exists on the board, announce that it cannot be added again and exit the function early to prevent duplicates.
+    announce(`${flippedId} is already on the board.`);
     return;
-  } // Check if the flipped pair already exists on the board to prevent duplicates.
+  }
+  // The reversed pair keeps the original's place among the history charts.
   const historyPosition = pairHistoryOrder.indexOf(id);
   if (historyPosition >= 0) {
     pairHistoryOrder[historyPosition] = flippedId;
     writeJson(PAIR_HISTORY_ORDER_KEY, pairHistoryOrder);
   }
-  settings.pairs[index] = flippedId; // Replace the original pair with the flipped pair in the settings.
-  const saved = saveSettings(); // Save the updated settings to localStorage, returning a boolean indicating whether the save was successful.
+  settings.pairs[index] = flippedId;
+  const saved = saveSettings();
   if (currentCalculatorPair() === id) {
-    elements.calculatorBase.value = quote; // If the flipped pair is currently selected in the calculator, update the calculator selectors to reflect the new base and quote currencies.
-    elements.calculatorQuote.value = base; // Update the calculator selectors to reflect the new base and quote currencies after flipping the pair direction.
-    previousCalculatorSelection = { base: quote, quote: base }; // Update the previous calculator selection to reflect the new base and quote currencies after flipping the pair direction.
-  } // If the flipped pair is currently selected in the calculator, update the calculator selectors to reflect the new base and quote currencies.
+    elements.calculatorBase.value = quote;
+    elements.calculatorQuote.value = base;
+    previousCalculatorSelection = { base: quote, quote: base };
+  }
   renderTable({ highlightPair: flippedId });
-  loadRates(); // Refresh the reference rates for the updated pair direction, ensuring that the calculator and table display the correct rates for the new pair.
-  loadPairHistory(); // Refresh the pair history for the updated pair direction, ensuring that any historical data displayed in the UI reflects the new pair configuration.
+  loadRates();
+  loadPairHistory();
   announce(
     saved
       ? `${id} direction changed to ${flippedId}. Desk prices remain separate for each direction.`
@@ -1576,32 +1643,40 @@ function flipPairDirection(id) {
   );
 }
 
-// Apply the current view preferences (theme, density, filter, sort) to the document body and relevant UI elements. Optionally persist the preferences to localStorage for future sessions.
+// ---------------------------------------------------------------------------
+// View preferences
+// ---------------------------------------------------------------------------
+
+// Applies theme, density and the board controls, and saves them unless `persist` is false.
 function applyViewPreferences({ persist = true } = {}) {
-  document.body.dataset.theme = view.theme; // Apply the selected theme (light or dark) to the document body, allowing CSS to style the application accordingly.
+  document.body.dataset.theme = view.theme;
   cosmos.setTheme(view.theme); // The star fields are painted in the theme's colours.
-  document.body.dataset.density = view.density; // Apply the selected density (comfortable or compact) to the document body, allowing CSS to adjust spacing and layout for the rates table and other UI elements.
-  elements.pairFilter.value = view.filter; // Set the filter dropdown in the UI to reflect the current view filter (e.g., all, priced, needs-prices, reference-issues), allowing users to see which filter is active.
-  elements.pairSort.value = view.sort; // Set the sort dropdown in the UI to reflect the current view sort option (e.g., code, name, rate-high, rate-low, board), allowing users to see which sorting method is active.
-  elements.boardDensity.value = view.density; // Set the density dropdown in the UI to reflect the current view density (comfortable or compact), allowing users to see which density setting is active.
+  document.body.dataset.density = view.density;
+  elements.pairFilter.value = view.filter;
+  elements.pairSort.value = view.sort;
+  elements.boardDensity.value = view.density;
   elements.pairCardSort.value = view.pairCardSort;
   elements.marketCardSort.value = view.marketCardSort;
   elements.quoteCardSort.value = view.quoteCardSort;
-  elements.boardTheme.value = view.theme; // Set the theme dropdown in the UI to reflect the current view theme (light or dark), allowing users to see which theme setting is active.
+  elements.boardTheme.value = view.theme;
   const themeAction = view.theme === "night" ? "Switch to bright mode" : "Switch to night mode";
   elements.themeToggle.setAttribute("title", themeAction);
   elements.themeToggle.setAttribute("aria-pressed", String(view.theme === "night"));
   elements.themeToggleLabel.textContent = view.theme === "night" ? "Day mode" : "Night mode";
-  if (persist) writeJson(VIEW_STORAGE_KEY, view); // Persist the current view preferences to localStorage, allowing the application to remember the user's settings across sessions.
+  if (persist) writeJson(VIEW_STORAGE_KEY, view);
 }
 
-// Open the dialog for adding a new currency pair, populating the base and quote selectors with available currencies and metals. This function also sets default selections based on preferred currencies and updates the pair preview accordingly.
+// ---------------------------------------------------------------------------
+// Add pair dialog
+// ---------------------------------------------------------------------------
+
+// Opens the add pair dialog with currencies and metals in separate groups, USD/EUR preselected.
 function openPairDialog() {
   if (settings.pairs.length >= MAX_BOARD_PAIRS) {
-    announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`); // If the board has reached its maximum capacity, announce that no more pairs can be added and exit the function early to prevent opening the add pair dialog.
+    announce(`This board supports up to ${MAX_BOARD_PAIRS} pairs.`);
     return;
-  } // Check if the board has reached its maximum capacity before opening the dialog for adding a new pair.
-  const available = ensureSpecialAssets(currencies); // Ensure that special assets (like gold and silver) are included in the list of available currencies for the pair selection dialog.
+  }
+  const available = ensureSpecialAssets(currencies);
   const currenciesMarkup = available
     .filter(({ code }) => !METAL_CODES.has(code))
     .map(
@@ -1617,8 +1692,8 @@ function openPairDialog() {
     )
     .join("");
   const optionMarkup = `<optgroup label="Currencies">${currenciesMarkup}</optgroup><optgroup label="Precious metals">${metalsMarkup}</optgroup>`;
-  elements.pairBase.innerHTML = optionMarkup; // Populate the base currency selector with available currencies and metals, grouped into separate optgroups for clarity.
-  elements.pairQuote.innerHTML = optionMarkup; // Populate the quote currency selector with available currencies and metals, grouped into separate optgroups for clarity.
+  elements.pairBase.innerHTML = optionMarkup;
+  elements.pairQuote.innerHTML = optionMarkup;
   const preferredBase = available.some((currency) => currency.code === "USD")
     ? "USD"
     : available[0]?.code;
@@ -1630,28 +1705,28 @@ function openPairDialog() {
       '<option value="">Currency list unavailable</option>';
     elements.pairQuote.innerHTML =
       '<option value="">Currency list unavailable</option>';
-    elements.pairBase.disabled = true; // Disable the base currency selector if the currency list is unavailable, preventing user interaction with an empty or invalid selection.
-    elements.pairQuote.disabled = true; // Disable the quote currency selector if the currency list is unavailable, preventing user interaction with an empty or invalid selection.
+    elements.pairBase.disabled = true;
+    elements.pairQuote.disabled = true;
     elements.pairPreview.innerHTML =
       "<span>PAIR PREVIEW</span><strong>Coverage unavailable</strong><small>Refresh the reference feed and try again.</small>";
   } else {
-    elements.pairBase.disabled = false; // Enable the base currency selector if the currency list is available, allowing the user to select a base currency for the new pair.
-    elements.pairQuote.disabled = false; // Enable the quote currency selector if the currency list is available, allowing the user to select a quote currency for the new pair.
-    elements.pairBase.value = preferredBase; // Set the default selections for the base and quote currency selectors based on preferred currencies (USD for base, EUR for quote) or the first available options if the preferred currencies are not present.
-    elements.pairQuote.value = preferredQuote; // Set the default selections for the base and quote currency selectors based on preferred currencies (USD for base, EUR for quote) or the first available options if the preferred currencies are not present.
-    updatePairPreview(); // Update the pair preview section in the add pair dialog to reflect the currently selected base and quote currencies, providing guidance on valid combinations and existing pairs.
+    elements.pairBase.disabled = false;
+    elements.pairQuote.disabled = false;
+    elements.pairBase.value = preferredBase;
+    elements.pairQuote.value = preferredQuote;
+    updatePairPreview();
   }
   elements.pairDialog.showModal();
 }
 
-// Update the pair preview section in the add pair dialog based on the currently selected base and quote currencies. This function checks for existing pairs, unsupported combinations, and provides appropriate guidance to the user.
+// Says whether the selected pair can be added, and if not, why.
 function updatePairPreview() {
-  const base = elements.pairBase.value; // Get the currently selected base currency from the add pair dialog.
-  const quote = elements.pairQuote.value; // Get the currently selected quote currency from the add pair dialog.
-  const id = `${base}/${quote}`; // Construct the currency pair ID in the format "BASE/QUOTE" for validation and display purposes.
-  const exists = settings.pairs.includes(id); // Check if the constructed pair ID already exists in the current settings to prevent duplicates on the board.
-  const same = base === quote; // Check if the selected base and quote currencies are the same, which is not allowed for a valid currency pair.
-  const unsupported = !isSupportedPair(base, quote); // Check if the selected base and quote currencies form an unsupported pair (e.g., gold or silver without USD) to provide appropriate guidance to the user.
+  const base = elements.pairBase.value;
+  const quote = elements.pairQuote.value;
+  const id = `${base}/${quote}`;
+  const exists = settings.pairs.includes(id);
+  const same = base === quote;
+  const unsupported = !isSupportedPair(base, quote);
   const detail = same
     ? "Choose two different currencies."
     : unsupported
@@ -1664,20 +1739,24 @@ function updatePairPreview() {
   elements.pairPreview.innerHTML = `<span>PAIR PREVIEW</span><strong>${escapeHtml(base || "—")} → ${escapeHtml(quote || "—")}</strong><small>${escapeHtml(detail)}</small>`;
 }
 
-// Open the dialog for setting desk prices for a specific currency pair, populating the fields with any existing prices and displaying reference rate information. This function also validates the pair and updates the UI accordingly.
+// ---------------------------------------------------------------------------
+// Desk price dialog
+// ---------------------------------------------------------------------------
+
+// Opens the desk price dialog for a pair on the board.
 function openPriceDialog(id) {
-  if (!settings.pairs.includes(id)) return; // If the specified pair is not part of the current settings, exit the function early to prevent opening the price dialog for an invalid or unrecognized pair.
-  const { base, quote } = pairParts(id); // Extract the base and quote currencies from the pair ID for use in the dialog title, description, and reference rate display.
-  const prices = settings.prices[id] ?? { buy: "", sell: "" }; // Retrieve any existing desk prices for the specified pair from the settings, defaulting to empty strings if no prices are set.
-  const reference = referenceRates[id]; // Retrieve the reference rate for the specified pair from the cached reference rates, if available, to display it in the dialog.
-  elements.pricePairId.value = id; // Set the hidden input field in the price dialog form to the specified pair ID, allowing the form submission handler to know which pair's prices are being edited.
-  elements.priceDialogTitle.textContent = `Set ${base} / ${quote} prices`; // Update the dialog title to indicate that the user is setting desk prices for the specified currency pair, providing clear context for the action being performed.
+  if (!settings.pairs.includes(id)) return;
+  const { base, quote } = pairParts(id);
+  const prices = settings.prices[id] ?? { buy: "", sell: "" };
+  const reference = referenceRates[id];
+  elements.pricePairId.value = id;
+  elements.priceDialogTitle.textContent = `Set ${base} / ${quote} prices`;
   elements.priceDialogDescription.textContent = `Enter quote currency units per 1 ${base}. Desk prices are separate from the reference feed.`;
-  elements.priceBuy.value = prices.buy ?? ""; // Populate the buy price input field with the existing buy price for the specified pair, defaulting to an empty string if no price is set, allowing the user to edit or set a new buy price.
-  elements.priceSell.value = prices.sell ?? ""; // Populate the sell price input field with the existing sell price for the specified pair, defaulting to an empty string if no price is set, allowing the user to edit or set a new sell price.
+  elements.priceBuy.value = prices.buy ?? "";
+  elements.priceSell.value = prices.sell ?? "";
   document.querySelectorAll(".price-quote-code").forEach((node) => {
     node.textContent = quote;
-  }); // Update all elements in the dialog that display the quote currency code to reflect the currently selected quote currency, ensuring consistency in the UI and providing clear context for the user when entering desk prices.
+  });
   elements.priceReferenceRate.textContent = reference
     ? `1 ${base} = ${formatPairRate(reference.rate)} ${quote}`
     : "No reference rate available";
@@ -1689,7 +1768,7 @@ function openPriceDialog(id) {
   elements.priceMargin.value = view.marginPercent;
   elements.applyMargin.disabled = !reference;
   updateMarginPreview();
-  elements.priceDialog.showModal(); // Open the price dialog modal to allow the user to set or edit desk prices for the selected currency pair.
+  elements.priceDialog.showModal();
 }
 
 // Under the price fields: what the prices now in the dialog would earn against the reference.
@@ -1726,6 +1805,10 @@ function fillPricesFromMargin() {
   writeJson(VIEW_STORAGE_KEY, view);
   updateMarginPreview();
 }
+
+// ---------------------------------------------------------------------------
+// Rate sheet
+// ---------------------------------------------------------------------------
 
 // The desk's own price list as rows, for copying or downloading.
 function currentRateSheet() {
@@ -1777,20 +1860,24 @@ function downloadRateSheet() {
   announce(`Rate sheet with ${rows.length} pair${rows.length === 1 ? "" : "s"} downloaded.`);
 }
 
-// Close a given dialog if it is currently open. This function checks the dialog's open state and calls the close method if necessary.
+// ---------------------------------------------------------------------------
+// Dialog actions
+// ---------------------------------------------------------------------------
+
 function closeDialog(dialog) {
-  if (dialog.open) dialog.close(); // Close the dialog only if it is currently open to avoid unnecessary operations or errors.
+  if (dialog.open) dialog.close();
 }
 
-// Handle the submission of the price dialog form, validating the entered buy and sell rates, updating the settings, saving them, and re-rendering the table and calculator. This function also provides user feedback for validation errors.
+// Saves the desk prices entered in the price dialog. Clearing both fields removes the pair's
+// prices.
 function handlePriceSave(event) {
-  event.preventDefault(); // Prevent the default form submission behavior to handle the save operation via JavaScript.
-  const id = elements.pricePairId.value; // Retrieve the currency pair ID from the hidden input field in the price dialog form.
-  const buy = elements.priceBuy.value.trim(); // Retrieve and trim the entered buy rate from the form input, preparing it for validation and storage.
-  const sell = elements.priceSell.value.trim(); // Retrieve and trim the entered sell rate from the form input, preparing it for validation and storage.
-  const { quote } = pairParts(id); // Extract the quote currency from the pair ID for use in validation messages and display.
-  const options = { maxScale: 8, maxDigits: 30 }; // Define validation options for decimal numbers, specifying a maximum of 8 decimal places and a maximum of 30 total digits to ensure that rates are within acceptable bounds.
-  if (!id || !settings.pairs.includes(id)) return; // If the pair ID is missing or not part of the current settings, exit the function early to prevent saving prices for an invalid or unrecognized pair.
+  event.preventDefault();
+  const id = elements.pricePairId.value;
+  const buy = elements.priceBuy.value.trim();
+  const sell = elements.priceSell.value.trim();
+  const { quote } = pairParts(id);
+  const options = { maxScale: 8, maxDigits: 30 };
+  if (!id || !settings.pairs.includes(id)) return;
   if (
     (buy &&
       (!MANUAL_RATE_PATTERN.test(buy) || !isPositiveDecimal(buy, options))) ||
@@ -1801,21 +1888,21 @@ function handlePriceSave(event) {
       "Enter a positive rate using a decimal point and up to 8 decimal places.";
     elements.priceValidation.hidden = false;
     return;
-  } // Validate that the entered buy and sell rates are positive decimals with up to 8 decimal places, providing feedback if they are invalid.
+  }
   if (buy && sell && compareDecimals(buy, sell) > 0) {
     elements.priceValidation.textContent =
       "The buy rate must be less than or equal to the sell rate for this pair direction.";
-    elements.priceValidation.hidden = false; // Ensure that the buy rate is less than or equal to the sell rate, providing feedback if this condition is not met.
+    elements.priceValidation.hidden = false;
     return;
-  } // Ensure that the buy rate is less than or equal to the sell rate, providing feedback if this condition is not met.
+  }
   if (buy || sell)
-    // The time and the reference a price was set against let the board flag it once the reference has moved.
+    // When the price was set, and against which reference, so the board can flag later moves.
     settings.prices[id] = { buy, sell, setAt: new Date().toISOString(), referenceAtSet: referenceRates[id]?.rate ?? null };
-  else delete settings.prices[id]; // If both buy and sell rates are empty, remove any existing prices for the specified pair from the settings.
-  const saved = saveSettings(); // Persist the updated settings to localStorage, returning a boolean indicating whether the save was successful.
-  closeDialog(elements.priceDialog); // Close the price dialog after saving the prices.
-  renderTable({ highlightPair: id }); // Re-render the rates table, highlighting the pair for which prices were just saved.
-  renderCalculator(); // Re-render the calculator to reflect any changes in desk prices for the selected pair.
+  else delete settings.prices[id];
+  const saved = saveSettings();
+  closeDialog(elements.priceDialog);
+  renderTable({ highlightPair: id });
+  renderCalculator();
   announce(
     saved
       ? `${id} desk prices saved on this device.`
@@ -1823,7 +1910,11 @@ function handlePriceSave(event) {
   );
 }
 
-// Update the displayed date in the UI to reflect the current date, formatted according to the user's locale. This function uses the Intl.DateTimeFormat API for localization.
+// ---------------------------------------------------------------------------
+// Header and navigation
+// ---------------------------------------------------------------------------
+
+// Today's date in the header.
 function populateDate() {
   document.querySelector("#today-label").textContent = new Intl.DateTimeFormat(
     locale,
@@ -1831,58 +1922,61 @@ function populateDate() {
   ).format(new Date());
 }
 
-// Initialize the workspace navigation by setting up event listeners for navigation links, synchronizing the active link with the scroll position, and handling hash changes. This function ensures that the correct navigation item is highlighted based on the user's current scroll position in the document.
+// Highlights the sidebar link of the section under a reading line 40% down the viewport.
 function initializeWorkspaceNavigation() {
-  const links = [...document.querySelectorAll(".nav-item[href^='#']")]; // Select all navigation links that point to sections within the page (i.e., those with href attributes starting with "#").
+  const links = [...document.querySelectorAll(".nav-item[href^='#']")];
   const destinations = links
     .map((link) => ({
       link,
       section: document.querySelector(link.getAttribute("href")),
     }))
     .filter(({ section }) => section);
-  if (!destinations.length) return; // If there are no valid destination sections corresponding to the navigation links, exit the function early to avoid unnecessary processing.
+  if (!destinations.length) return;
 
-  // Activate a specific navigation link by adding the "is-active" class and setting the "aria-current" attribute, while deactivating all other links.
   const activate = (activeLink) => {
     for (const { link } of destinations) {
-      const isActive = link === activeLink; // Determine if the current link is the one to be activated.
-      link.classList.toggle("is-active", isActive); // Toggle the "is-active" class on the link based on whether it is the active link, providing visual feedback to the user about which section is currently selected.
+      const isActive = link === activeLink;
+      link.classList.toggle("is-active", isActive);
       if (isActive)
-        link.setAttribute("aria-current", "location"); // Set the "aria-current" attribute to "location" for the active link to improve accessibility, indicating to assistive technologies that this link represents the current location in the document.
-      else link.removeAttribute("aria-current"); // Remove the "aria-current" attribute from non-active links to ensure that only the active link is marked as representing the current location, maintaining clarity for users relying on assistive technologies.
+        link.setAttribute("aria-current", "location");
+      else link.removeAttribute("aria-current");
     }
-  }; // This function updates the active state of navigation links based on the currently active link.
+  };
   const syncToScrollPosition = () => {
-    const readingLine = window.innerHeight * 0.4; // Define a "reading line" at 40% of the viewport height to determine which section is currently in view for activating the corresponding navigation link.
+    const readingLine = window.innerHeight * 0.4;
     const current = [...destinations]
       .reverse()
       .find(
         ({ section }) => section.getBoundingClientRect().top <= readingLine,
       );
-    activate((current ?? destinations[0]).link); // Activate the navigation link corresponding to the section that is currently in view, or default to the first link if no sections are above the reading line.
+    activate((current ?? destinations[0]).link);
   };
 
-  // Add click event listeners to each navigation link to activate the corresponding section when clicked, and synchronize the active state with the scroll position.
   destinations.forEach(({ link }) =>
     link.addEventListener("click", () => activate(link)),
-  ); // Add click event listeners to each navigation link to activate the corresponding section when clicked, and synchronize the active state with the scroll position.
-  window.addEventListener("hashchange", syncToScrollPosition); // Add a hashchange event listener to synchronize the active navigation link with the current scroll position when the URL hash changes.
-  let scrollFrame = 0; // Initialize a variable to track the requestAnimationFrame ID for scroll events, allowing for efficient synchronization of the active navigation link with the scroll position.
+  );
+  window.addEventListener("hashchange", syncToScrollPosition);
+  // Scroll handling is batched to one update per animation frame.
+  let scrollFrame = 0;
   window.addEventListener(
     "scroll",
     () => {
-      if (scrollFrame) return; // If a scroll event is already being processed, skip additional events to avoid redundant updates and improve performance.
+      if (scrollFrame) return;
       scrollFrame = window.requestAnimationFrame(() => {
-        scrollFrame = 0; // Reset the scrollFrame variable to allow for future scroll events to be processed, ensuring that the active navigation link is updated in response to user scrolling.
-        syncToScrollPosition(); // Synchronize the active navigation link with the current scroll position, ensuring that the correct section is highlighted based on the user's viewport.
+        scrollFrame = 0;
+        syncToScrollPosition();
       });
     },
     { passive: true },
-  ); // Add a passive scroll event listener to improve performance by allowing the browser to handle scrolling without blocking, while still synchronizing the active navigation link with the current scroll position.
-  syncToScrollPosition(); // Perform an initial synchronization of the active navigation link with the current scroll position when the page loads, ensuring that the correct section is highlighted based on the user's initial viewport.
+  );
+  syncToScrollPosition();
 }
 
-// Initialize event listeners for various UI interactions, including button taps, adding pairs, refreshing rates, changing history ranges, searching, toggling display options, and handling pair management actions. This function sets up the necessary event handlers to ensure a responsive and interactive user experience.
+// ---------------------------------------------------------------------------
+// Event wiring
+// ---------------------------------------------------------------------------
+
+// Wires up the page's controls.
 function initializeEvents() {
   // Chart cards are reordered by dragging (or with the keyboard). Each grid saves its own order.
   const saveCardOrder = (label, storageKey, order) => {
@@ -1964,43 +2058,48 @@ function initializeEvents() {
     card.style.setProperty("--spot-x", `${event.clientX - bounds.left}px`);
     card.style.setProperty("--spot-y", `${event.clientY - bounds.top}px`);
   }, { passive: true });
-  let draggedPairId = null; // Track the ID of the currency pair currently being dragged for reordering on the board, allowing the application to manage drag-and-drop interactions and update the order of pairs accordingly.
+  // The board row being dragged by its handle (see the drag handlers below).
+  let draggedPairId = null;
+  // Press feedback on buttons, unless the system asks for reduced motion.
   document.addEventListener("pointerdown", (event) => {
-    const button = event.target.closest(".button"); // Add a visual "tapped" effect to buttons when they are pressed, unless the user has requested reduced motion.
+    const button = event.target.closest(".button");
     if (
       !button ||
       button.disabled ||
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
     )
       return;
-    button.classList.remove("is-tapped"); // Remove the "is-tapped" class from the button to reset any previous tap effect, ensuring that the visual feedback is applied correctly for each new tap interaction.
-    void button.offsetWidth; // Trigger a reflow to ensure that the "is-tapped" class removal is processed before adding it back, allowing the tap effect to be visually noticeable.
-    button.classList.add("is-tapped"); // Add the "is-tapped" class to the button to apply the visual tap effect, providing immediate feedback to the user that the button has been pressed.
-    window.setTimeout(() => button.classList.remove("is-tapped"), 440); // Remove the "is-tapped" class after a short delay (440 milliseconds) to allow the tap effect to be visible for a brief moment, enhancing the user experience without lingering too long.
-  }); // Add a visual "tapped" effect to buttons when they are pressed, unless the user has requested reduced motion.
+    button.classList.remove("is-tapped");
+    void button.offsetWidth; // Reflow, so that re-adding the class restarts the animation.
+    button.classList.add("is-tapped");
+    window.setTimeout(() => button.classList.remove("is-tapped"), 440);
+  });
   document
     .querySelector("#add-pair-button")
     .addEventListener("click", openPairDialog);
   document
     .querySelector("#first-price-button")
     .addEventListener("click", () => openPriceDialog(settings.pairs[0]));
+  // Refresh reloads every data set on the page.
   elements.refreshButton.addEventListener("click", () => {
-    loadRates({ announceSuccess: true }); // Refresh the reference rates when the refresh button is clicked, providing user feedback upon successful completion.
-    loadPairHistory(); // Refresh the pair history for the currently selected pair when the refresh button is clicked, ensuring that the displayed historical data is up to date.
+    loadRates({ announceSuccess: true });
+    loadPairHistory();
     loadMarketHistory();
     loadMarketQuotes();
     refreshCalculatorReference(currentCalculatorPair(), { force: true });
-  }); // Refresh the reference rates, pair history, and calculator reference for the currently selected pair when the refresh button is clicked.
+  });
+  // Range buttons of the currency charts; the metals and oil charts have their own below.
   elements.historyRanges.addEventListener("click", (event) => {
-    const button = event.target.closest?.("[data-history-range]"); // Handle clicks on history range buttons to update the selected range and load the corresponding pair history data.
+    const button = event.target.closest?.("[data-history-range]");
     if (
       !button ||
       !elements.historyRanges.contains(button) ||
       button.disabled ||
       pairCharts.range === button.dataset.historyRange
     )
-      return; // Ignore clicks on disabled buttons or if the selected range is already active.
-    pairCharts.range = button.dataset.historyRange; // The newly selected range; its charts start empty so that the old range is not shown under the new label.
+      return;
+    // Clear the old range's charts so that they are not shown under the new range's label.
+    pairCharts.range = button.dataset.historyRange;
     pairCharts.data = {};
     pairCharts.series = {};
     elements.historyRanges
@@ -2010,9 +2109,9 @@ function initializeEvents() {
           "aria-pressed",
           String(rangeButton === button),
         );
-      }); // Update the active state of history range buttons and load the corresponding pair history when a new range is selected.
+      });
     loadPairHistory();
-  }); // Handle clicks on history range buttons to update the selected range and load the corresponding pair history data.
+  });
   elements.marketHistoryRanges.addEventListener("click", (event) => {
     const button = event.target.closest?.("[data-market-history-range]");
     if (!button || !elements.marketHistoryRanges.contains(button) || button.disabled || marketCharts.range === button.dataset.marketHistoryRange) return;
@@ -2029,11 +2128,11 @@ function initializeEvents() {
     renderTable();
   });
   elements.optionsToggle.addEventListener("click", () => {
-    const opening = elements.displayOptions.hidden; // Determine whether the display options are currently hidden and will be opened.
-    elements.displayOptions.hidden = !opening; // Toggle the visibility of the display options section based on the current state.
-    elements.optionsToggle.setAttribute("aria-expanded", String(opening)); // Update the "aria-expanded" attribute of the options toggle button to reflect the new state, improving accessibility for screen readers.
-    if (opening) elements.pairFilter.focus(); // If the display options are being opened, set focus to the pair filter input for immediate user interaction.
-  }); // Toggle the visibility of display options when the options toggle button is clicked, and set focus to the pair filter input if the options are being opened.
+    const opening = elements.displayOptions.hidden;
+    elements.displayOptions.hidden = !opening;
+    elements.optionsToggle.setAttribute("aria-expanded", String(opening));
+    if (opening) elements.pairFilter.focus();
+  });
   elements.pairFilter.addEventListener("change", () => {
     view.filter = elements.pairFilter.value;
     applyViewPreferences();
@@ -2058,42 +2157,43 @@ function initializeEvents() {
     announce(view.theme === "night" ? "Night mode on." : "Bright mode on.");
   });
   elements.resetDisplayOptions.addEventListener("click", () => {
-    Object.assign(view, DEFAULT_VIEW); // Reset the view preferences to their default values, including theme, density, filter, and sort options.
-    applyViewPreferences(); // Apply the default view preferences to the document body and relevant UI elements, ensuring that the display reflects the reset state.
-    renderTable(); // Re-render the rates table to reflect the reset display options, ensuring that the table layout and content are updated accordingly.
+    Object.assign(view, DEFAULT_VIEW);
+    applyViewPreferences();
+    renderTable();
     renderMarketHistory();
     renderMarketCardOrder();
-    announce("Board view options reset."); // Announce to the user that the board view options have been reset to their default values, providing feedback on the action taken.
-  }); // Reset the display options to their default values when the reset button is clicked, and re-render the table to reflect the changes.
-  elements.pairBase.addEventListener("change", updatePairPreview); // Update the pair preview in the add pair dialog whenever the base currency selection changes, providing immediate feedback to the user.
-  elements.pairQuote.addEventListener("change", updatePairPreview); // Update the pair preview in the add pair dialog whenever the quote currency selection changes, providing immediate feedback to the user.
+    announce("Board view options reset.");
+  });
+  elements.pairBase.addEventListener("change", updatePairPreview);
+  elements.pairQuote.addEventListener("change", updatePairPreview);
+  // Adds the pair chosen in the add pair dialog.
   elements.pairForm.addEventListener("submit", (event) => {
-    event.preventDefault(); // Prevent the default form submission behavior to handle the pair addition logic manually.
-    const base = elements.pairBase.value; // Store the selected base currency from the add pair form for validation and processing.
-    const quote = elements.pairQuote.value; // Store the selected quote currency from the add pair form for validation and processing.
-    const id = `${base}/${quote}`; // Construct the currency pair ID in the format "BASE/QUOTE" for validation and processing.
+    event.preventDefault();
+    const base = elements.pairBase.value;
+    const quote = elements.pairQuote.value;
+    const id = `${base}/${quote}`;
     if (
       base === quote ||
       !isSupportedPair(base, quote) ||
       settings.pairs.includes(id)
     ) {
-      updatePairPreview(); // Update the pair preview to reflect the current selections and provide feedback if the selected pair is invalid (e.g., same base and quote, unsupported pair, or already on the board).
+      updatePairPreview();
       return;
-    } // Validate that the selected base and quote currencies are different, supported, and not already on the board before proceeding to add the new pair.
-    if (settings.pairs.length >= MAX_BOARD_PAIRS) return; // Check if the board has reached its maximum capacity before adding the new pair.
-    settings.pairs.push(id); // Add the new currency pair to the settings.pairs array, effectively adding it to the rates board.
-    const saved = saveSettings(); // Save the updated settings to localStorage or session storage, depending on availability, and store the result of the save operation in the "saved" variable.
-    closeDialog(elements.pairDialog); // Close the add pair dialog after successfully adding the new pair to the board, providing a seamless user experience.
-    renderTable({ animatePair: id, highlightPair: id }); // Re-render the rates table to reflect the addition of the new pair, applying an animation to the newly added row and highlighting it for visual feedback.
-    renderCalculatorOptions(); // Re-render the calculator options to include the newly added pair, ensuring that the base and quote selectors are updated with the available currencies and metals.
-    loadRates(); // Load the latest reference rates for all pairs, including the newly added pair, to ensure that the rates board displays up-to-date information.
-    loadPairHistory(); // Load the historical data for all pairs, including the newly added pair, to provide users with access to past rate information and trends.
+    }
+    if (settings.pairs.length >= MAX_BOARD_PAIRS) return;
+    settings.pairs.push(id);
+    const saved = saveSettings();
+    closeDialog(elements.pairDialog);
+    renderTable({ animatePair: id, highlightPair: id });
+    renderCalculatorOptions();
+    loadRates();
+    loadPairHistory();
     announce(
       saved
         ? `${id} added to the rates board.`
         : `${id} added for this session; browser storage is unavailable.`,
     );
-  }); // Handle the submission of the add pair form, validating the selected currencies and adding the new pair to the board if valid. This includes saving settings, closing the dialog, re-rendering the table and calculator options, and announcing the result to the user.
+  });
   elements.priceForm.addEventListener("submit", handlePriceSave);
   elements.priceBuy.addEventListener("input", updateMarginPreview);
   elements.priceSell.addEventListener("input", updateMarginPreview);
@@ -2110,105 +2210,109 @@ function initializeEvents() {
     applyViewPreferences();
     renderTable();
   });
-  // The customer display is a page of its own that reads the desk prices saved in this browser.
+  // The customer display is a separate page that reads the desk prices saved by this one.
   elements.openDisplay.addEventListener("click", () => {
     window.open("/display.html", "counterline-display", "popup=yes,width=1280,height=800");
   });
+  // Clear removes both desk prices of the pair.
   document
     .querySelector("#clear-price-button")
     .addEventListener("click", () => {
-      const id = elements.pricePairId.value; // Store the ID of the currency pair for which desk prices are being cleared, as specified in the hidden input field of the price dialog.
-      delete settings.prices[id]; // Remove any associated desk prices for the specified currency pair from the settings.prices object, effectively clearing the prices for that pair.
-      const saved = saveSettings(); // Save the updated settings to localStorage or session storage, returning a boolean indicating whether the save operation was successful.
-      closeDialog(elements.priceDialog); // Close the price dialog after clearing the desk prices for the specified currency pair, providing a seamless user experience.
-      renderTable({ highlightPair: id }); // Re-render the rates table to reflect the clearing of desk prices for the specified currency pair, highlighting the row for visual feedback.
-      renderCalculator(); // Re-render the calculator to ensure that any displayed results for the cleared pair are updated accordingly, reflecting the absence of desk prices.
+      const id = elements.pricePairId.value;
+      delete settings.prices[id];
+      const saved = saveSettings();
+      closeDialog(elements.priceDialog);
+      renderTable({ highlightPair: id });
+      renderCalculator();
       announce(
         saved
           ? `${id} customer prices cleared.`
           : `${id} prices cleared for this session; browser storage is unavailable.`,
       );
-    }); // Handle the clearing of desk prices for a specific currency pair, updating the settings, saving them, closing the price dialog, re-rendering the table and calculator, and announcing the result to the user.
+    });
+  // Row and dialog buttons, delegated because the board's rows are re-rendered.
   document.body.addEventListener("click", (event) => {
-    const closeButton = event.target.closest("[data-close-dialog]"); // Find the closest element with the "data-close-dialog" attribute, which indicates a request to close the nearest dialog.
+    const closeButton = event.target.closest("[data-close-dialog]");
     if (closeButton) {
-      closeDialog(closeButton.closest("dialog")); // Handle clicks on elements with the "data-close-dialog" attribute to close the nearest dialog when clicked.
+      closeDialog(closeButton.closest("dialog"));
       return;
-    } // Handle clicks on elements with the "data-close-dialog" attribute to close the nearest dialog when clicked.
-    const editButton = event.target.closest("[data-edit-price]"); // Find the closest element with the "data-edit-price" attribute, which indicates a request to edit desk prices for a specific currency pair.
+    }
+    const editButton = event.target.closest("[data-edit-price]");
     if (editButton) {
-      openPriceDialog(editButton.dataset.editPrice); // Handle clicks on elements with the "data-edit-price" attribute to open the price dialog for the specified currency pair when clicked.
+      openPriceDialog(editButton.dataset.editPrice);
       return;
-    } // Handle clicks on elements with the "data-edit-price" attribute to open the price dialog for the specified currency pair when clicked.
-    const flipButton = event.target.closest("[data-flip-pair]"); // Find the closest element with the "data-flip-pair" attribute, which indicates a request to flip the direction of a currency pair.
+    }
+    const flipButton = event.target.closest("[data-flip-pair]");
     if (flipButton) {
-      flipPairDirection(flipButton.dataset.flipPair); // Handle clicks on elements with the "data-flip-pair" attribute to flip the direction of the specified currency pair when clicked.
+      flipPairDirection(flipButton.dataset.flipPair);
       return;
-    } // Handle clicks on elements with the "data-flip-pair" attribute to flip the direction of the specified currency pair when clicked.
-    const moveButton = event.target.closest("[data-move-pair]"); // Find the closest element with the "data-move-pair" attribute, which indicates a request to move a currency pair up or down in the board order.
+    }
+    const moveButton = event.target.closest("[data-move-pair]");
     if (moveButton) {
       movePairInBoard(
         moveButton.dataset.movePair,
         moveButton.dataset.moveDirection,
-      ); // Handle clicks on elements with the "data-move-pair" attribute to move the specified currency pair up or down in the board order when clicked.
+      );
       return;
-    } // Handle clicks on elements with the "data-move-pair" attribute to move the specified currency pair within the board when clicked.
-    const removeButton = event.target.closest("[data-remove-pair]"); // Find the closest element with the "data-remove-pair" attribute, which indicates a request to remove a currency pair from the board.
+    }
+    const removeButton = event.target.closest("[data-remove-pair]");
     if (removeButton) {
-      const id = removeButton.dataset.removePair; // Store the ID of the currency pair to be removed from the board, as specified in the "data-remove-pair" attribute of the clicked element.
-      if (removeButton.disabled) return; // If the remove button is already disabled, exit the function early to prevent multiple removal actions for the same pair.
-      removeButton.disabled = true; // Disable the remove button to prevent further clicks while the removal process is underway, ensuring that the user cannot trigger multiple removal actions for the same pair.
-      removeButton.closest("tr")?.classList.add("row-leaving"); // Add a visual feedback class to the closest table row of the removed pair to indicate that it is being removed from the board, providing a visual cue to the user that the removal action is in progress.
+      const id = removeButton.dataset.removePair;
+      if (removeButton.disabled) return;
+      removeButton.disabled = true;
+      removeButton.closest("tr")?.classList.add("row-leaving");
+      // Let the row's exit animation play before the board re-renders.
       const delay = window.matchMedia("(prefers-reduced-motion: reduce)")
         .matches
         ? 0
-        : 180; // Determine the delay before actually removing the pair from the settings and re-rendering the table, based on whether the user has requested reduced motion. If reduced motion is preferred, set the delay to 0; otherwise, set it to 180 milliseconds to allow for a brief visual transition effect.
+        : 180;
       window.setTimeout(() => {
-        settings.pairs = settings.pairs.filter((pair) => pair !== id); // Remove the specified currency pair from the settings.pairs array, effectively removing it from the rates board.
-        delete settings.prices[id]; // Remove any associated desk prices for the specified currency pair from the settings.prices object, ensuring that no residual data remains for the removed pair.
-        const saved = saveSettings(); // Save the updated settings to localStorage or session storage, returning a boolean indicating whether the save operation was successful.
-        renderTable(); // Re-render the rates table to reflect the removal of the specified currency pair, updating the UI accordingly.
-        loadPairHistory(); // Load the pair history data to ensure that any historical data for the removed pair is no longer displayed or accessible in the UI.
+        settings.pairs = settings.pairs.filter((pair) => pair !== id);
+        delete settings.prices[id];
+        const saved = saveSettings();
+        renderTable();
+        loadPairHistory();
         announce(
           saved
             ? `${id} removed from the rates board.`
             : `${id} removed for this session; browser storage is unavailable.`,
-        ); // Announce the result of the removal operation to the user, indicating whether the pair was successfully removed and whether the changes were saved to persistent storage or only applied for the current session.
+        );
       }, delay);
     }
-  }); // Handle clicks on elements with the "data-remove-pair" attribute to remove the specified currency pair from the board when clicked, including updating settings, saving them, re-rendering the table, and announcing the result to the user.
+  });
+  // Board rows can also be dragged by their handle (HTML drag and drop).
   elements.ratesBody.addEventListener("dragstart", (event) => {
-    const handle = event.target.closest("[data-drag-pair]"); // Find the closest element with the "data-drag-pair" attribute, which serves as the drag handle for a currency pair row.
-    if (!handle) return; // If there is no valid drag handle, exit the function early to prevent any further processing of the dragstart event.
-    draggedPairId = handle.dataset.dragPair; // Store the ID of the dragged currency pair in a variable for later use during the drag-and-drop operation.
-    event.dataTransfer.effectAllowed = "move"; // Set the allowed effect for the drag operation to "move", indicating that the dragged item can be moved to a new location.
-    event.dataTransfer.setData("text/plain", draggedPairId); // Set the data being transferred during the drag operation to the ID of the dragged currency pair, allowing it to be accessed during the drop event.
-    handle.closest("tr")?.classList.add("is-dragging"); // Add a visual feedback class to the closest table row of the dragged element to indicate that it is currently being dragged.
-  }); // Handle the start of a drag operation on a currency pair row, storing the dragged pair ID and applying visual feedback to indicate that the row is being dragged.
+    const handle = event.target.closest("[data-drag-pair]");
+    if (!handle) return;
+    draggedPairId = handle.dataset.dragPair;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", draggedPairId);
+    handle.closest("tr")?.classList.add("is-dragging");
+  });
   elements.ratesBody.addEventListener("dragover", (event) => {
-    if (!draggedPairId) return; // If there is no dragged pair ID, exit the function early to prevent any further processing of the dragover event.
-    const targetRow = event.target.closest("tr[data-pair]"); // Find the closest table row element that has a "data-pair" attribute, which represents the target currency pair for the dragover operation.
-    if (!targetRow || targetRow.dataset.pair === draggedPairId) return; // If there is no valid target row or if the target row is the same as the dragged pair, exit the function early to prevent any further processing of the dragover event.
-    event.preventDefault(); // Prevent the default behavior of the dragover event to allow for custom handling of the drag-and-drop operation, enabling the drop effect to be applied.
-    event.dataTransfer.dropEffect = "move"; // Set the drop effect for the dragover event to "move", indicating that the dragged item can be moved to a new location.
+    if (!draggedPairId) return;
+    const targetRow = event.target.closest("tr[data-pair]");
+    if (!targetRow || targetRow.dataset.pair === draggedPairId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
     elements.ratesBody
       .querySelectorAll(".drop-before, .drop-after")
       .forEach((row) => row.classList.remove("drop-before", "drop-after"));
-    const bounds = targetRow.getBoundingClientRect(); // Get the bounding rectangle of the target row to determine its position and dimensions on the screen, which will be used to calculate whether the dragged pair should be placed before or after the target row based on the cursor position.
-    const afterTarget = event.clientY > bounds.top + bounds.height / 2; // Determine whether the dragged pair should be placed after the target row based on the vertical position of the cursor relative to the midpoint of the target row's bounding rectangle.
-    targetRow.classList.add(afterTarget ? "drop-after" : "drop-before"); // Add a visual feedback class to the target row to indicate whether the dragged pair will be placed before or after it, providing immediate visual feedback to the user during the drag-and-drop operation.
-  }); // Handle the dragover event on the rates table body, providing visual feedback for potential drop targets and determining whether the dragged pair should be placed before or after the target row based on the cursor position.
+    const bounds = targetRow.getBoundingClientRect();
+    const afterTarget = event.clientY > bounds.top + bounds.height / 2;
+    targetRow.classList.add(afterTarget ? "drop-after" : "drop-before");
+  });
   elements.ratesBody.addEventListener("drop", (event) => {
-    if (!draggedPairId) return; // If there is no dragged pair ID, exit the function early to prevent any further processing of the drop event.
-    const targetRow = event.target.closest("tr[data-pair]"); // Find the closest table row element that has a "data-pair" attribute, which represents the target currency pair for the drop operation.
-    if (!targetRow) return; // If there is no valid target row, exit the function early to prevent any further processing of the drop event.
-    event.preventDefault(); // Prevent the default behavior of the drop event to allow for custom handling of the drop operation.
-    const sourceId = draggedPairId; // Store the ID of the dragged currency pair for reordering.
-    const targetId = targetRow.dataset.pair; // Store the ID of the target currency pair where the dragged pair will be dropped.
-    const afterTarget = targetRow.classList.contains("drop-after"); // Determine whether the dragged pair should be placed after the target based on the presence of the "drop-after" class on the target row.
-    draggedPairId = null; // Reset the dragged pair ID to null after the drop operation is complete.
+    if (!draggedPairId) return;
+    const targetRow = event.target.closest("tr[data-pair]");
+    if (!targetRow) return;
+    event.preventDefault();
+    const sourceId = draggedPairId;
+    const targetId = targetRow.dataset.pair;
+    const afterTarget = targetRow.classList.contains("drop-after");
+    draggedPairId = null;
     reorderPair(sourceId, targetId, afterTarget, { restoreFocus: false });
-  }); // Handle the drop event on the rates table body, reordering the dragged currency pair based on the target row and whether it should be placed before or after the target. This function also prevents the default behavior and resets the dragged pair ID.
+  });
   elements.ratesBody.addEventListener("dragend", () => {
     draggedPairId = null;
     elements.ratesBody
@@ -2216,29 +2320,32 @@ function initializeEvents() {
       .forEach((row) =>
         row.classList.remove("is-dragging", "drop-before", "drop-after"),
       );
-  }); // Handle the end of a drag operation on the rates table body, resetting the dragged pair ID and removing any visual feedback classes from the rows.
+  });
+  // A click on the backdrop closes a dialog.
   for (const dialog of [elements.pairDialog, elements.priceDialog]) {
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();
     });
-  } // Allow users to close the pair and price dialogs by clicking outside the dialog content area, while preventing accidental closure when interacting with the dialog's content.
+  }
+  // Calculator controls.
   elements.calculatorBase.addEventListener("change", () =>
     changeCalculatorCurrencies("base"),
-  ); // Handle changes to the calculator's base currency selector, ensuring that the two currencies are not the same and updating the calculator results accordingly.
+  );
   elements.calculatorQuote.addEventListener("change", () =>
     changeCalculatorCurrencies("quote"),
-  ); // Handle changes to the calculator's quote currency selector, ensuring that the two currencies are not the same and updating the calculator results accordingly.
+  );
   elements.swapCurrencies.addEventListener("click", () => {
-    const base = elements.calculatorBase.value; // Store the current base currency value before swapping.
-    elements.calculatorBase.value = elements.calculatorQuote.value; // Swap the base currency value with the current quote currency value.
-    elements.calculatorQuote.value = base; // Swap the quote currency value with the previously stored base currency value.
-    changeCalculatorCurrencies("quote"); // Call the function to handle the change in calculator currencies, passing "quote" as the changed selector to ensure that the two currencies are not the same and updating the calculator results accordingly.
-  }); // Handle the swapping of the calculator's base and quote currencies when the swap button is clicked, updating the selectors and re-rendering the calculator results accordingly.
+    const base = elements.calculatorBase.value;
+    elements.calculatorBase.value = elements.calculatorQuote.value;
+    elements.calculatorQuote.value = base;
+    changeCalculatorCurrencies("quote");
+  });
   elements.calculatorAddPair.addEventListener(
     "click",
     addCalculatorPairToBoard,
-  ); // Handle the addition of the currently selected calculator pair to the rates board when the add pair button is clicked, validating the pair and updating the settings and UI accordingly.
-  elements.calculatorAmount.addEventListener("input", renderCalculator); // Handle input changes to the calculator's amount field, re-rendering the calculator results based on the entered amount and the selected currencies.
+  );
+  elements.calculatorAmount.addEventListener("input", renderCalculator);
+  // "/" focuses the search field unless the user is typing or a dialog is open.
   document.addEventListener("keydown", (event) => {
     if (
       event.key === "/" &&
@@ -2248,37 +2355,39 @@ function initializeEvents() {
       !elements.pairDialog.open &&
       !elements.priceDialog.open
     ) {
-      event.preventDefault(); // Prevent the default browser behavior for the "/" key to avoid conflicts with search functionality.
-      elements.searchInput.focus(); // Focus the search input field when the "/" key is pressed, allowing users to quickly start searching for currency pairs without manually clicking on the input field.
+      event.preventDefault();
+      elements.searchInput.focus();
     }
   });
 }
 
-/* Initialize the application by applying view preferences, populating the current date, setting up event listeners, initializing workspace navigation, 
-rendering the rates table, loading cached reference rates if available, and fetching the latest currencies, rates, and pair history. Additionally, 
-set up a periodic refresh of rates every 30 minutes when the document is visible.*/
-applyViewPreferences({ persist: false }); // Apply the user's view preferences (theme, density, filter, sort) to the document body and relevant UI elements without persisting them to localStorage.
-populateDate(); // Update the displayed date in the UI to reflect the current date, formatted according to the user's locale.
-initializeEvents(); // Set up event listeners for various UI interactions, including button taps, adding pairs, refreshing rates, changing history ranges, searching, toggling display options, and handling pair management actions.
-initializeWorkspaceNavigation(); // Set up the workspace navigation by synchronizing the active link with the scroll position and handling hash changes, ensuring that the correct navigation item is highlighted based on the user's current scroll position in the document.
-renderTable(); // Render the rates table based on the current settings, view preferences, and available reference rates, applying any necessary animations or highlights for updated pairs.
-const browserCache = readReferenceCache(); // Read cached reference rates from localStorage to provide a fallback in case the network request fails or is delayed.
+// ---------------------------------------------------------------------------
+// Start-up
+// ---------------------------------------------------------------------------
+
+// Render straight away from the rates this browser saved last time, then fetch fresh data.
+applyViewPreferences({ persist: false });
+populateDate();
+initializeEvents();
+initializeWorkspaceNavigation();
+renderTable();
+const browserCache = readReferenceCache();
 if (browserCache) {
-  // If cached reference rates are available in localStorage, use them to populate the reference rates and metadata, and render the table with a pending cache status.
-  referenceRates = browserCache.rates; // Populate the reference rates from the cached data in localStorage.
+  referenceRates = browserCache.rates;
   referenceMeta = {
     cacheStatus: "browser-cache-pending",
     errors: [],
     retrievedAt: browserCache.retrievedAt,
     checkedAt: browserCache.retrievedAt,
-  }; // Populate the reference metadata with a pending cache status and the retrieved timestamp from the cached data.
-  renderTable({ animateRows: true }); // Render the rates table with an animation to indicate that the data is being loaded from the browser cache, providing a visual cue to the user that the rates are being updated.
-} // If cached reference rates are not available, the application will proceed to fetch the latest currencies, rates, and pair history from the network.
-loadCurrencies(); // Fetch the latest list of available currencies and metals from the network, updating the internal state and UI accordingly.
-loadRates(); // Fetch the latest reference rates for the selected currency pairs from the network, updating the internal state and UI accordingly.
-loadPairHistory(); // Fetch the history charts for the pairs on the board.
+  };
+  renderTable({ animateRows: true });
+}
+loadCurrencies();
+loadRates();
+loadPairHistory();
 loadMarketHistory();
 loadMarketQuotes();
+// Reference rates refresh every 30 minutes and market quotes every 5, while the page is visible.
 window.setInterval(
   () => {
     if (document.visibilityState !== "visible") return;
@@ -2288,7 +2397,7 @@ window.setInterval(
     if (INTRADAY_HISTORY_RANGES.has(marketCharts.range)) loadMarketHistory();
   },
   30 * 60 * 1000,
-); // Refresh reference rates every 30 minutes, but only while the page is visible, to avoid requests nobody sees.
+);
 window.setInterval(
   () => {
     if (document.visibilityState === "visible") loadMarketQuotes();
