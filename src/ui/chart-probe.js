@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
 // Hover read-out for the history charts: a crosshair, a marker on the line, and a label with the
 // date and price of the point nearest to the pointer. On a touch screen a tap does the same and
 // the read-out stays until the next tap elsewhere.
