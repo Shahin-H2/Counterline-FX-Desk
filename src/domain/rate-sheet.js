@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
 // The desk's own price list, for sharing with customers or keeping on file. Only pairs that have
 // at least one desk price are listed; reference rates appear in the CSV for the desk's records
 // and never in the text meant for customers.
