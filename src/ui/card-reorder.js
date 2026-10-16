@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
 // Drag-to-reorder for a grid of cards, in the manner of iOS widgets: the picked-up card lifts and
 // follows the pointer while its neighbours slide out of the way.
 //
