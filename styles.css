@@ -1,3 +1,5 @@
+/* Copyright (c) 2026 Shahin Hassanyan. All rights reserved. */
+
 /*  ==========================================================================
                               Base styles
     ========================================================================== */
@@ -366,7 +368,7 @@ h1 { margin: 8px 0 6px; font: 700 clamp(33px, 3.2vw, 41px)/1.1 "Manrope", sans-s
   margin-top: 22px; padding: 23px; border: 1px solid var(--line); border-radius: 8px;
   background: var(--white); box-shadow: 0 8px 25px rgb(24 61 49 / 5%);
   animation: enter-up .48s .2s ease-out both;
-} /* .history-section[hidden] { display: none !important; } */
+}
 .history-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; }
 .history-heading .card-kicker { color: #798a7b; }
 .history-heading h2 { margin: 7px 0 4px; color: var(--ink); font: 700 22px/1.2 "Manrope", sans-serif; letter-spacing: -.55px; }
@@ -445,7 +447,7 @@ body.is-card-dragging * { cursor: grabbing !important; }
 .app-dialog[open] { opacity: 1; transform: translateY(0) scale(1); }
 .app-dialog::backdrop { background: rgb(12 32 30 / 46%); backdrop-filter: blur(2px); opacity: 0; transition: opacity .22s ease, display .22s allow-discrete, overlay .22s allow-discrete; }
 .app-dialog[open]::backdrop { opacity: 1; }
-/* Dialog open animation is delayed to allow for the backdrop to fade in first, so that the dialog doesn't appear to "pop" in front of the backdrop. */
+/* Starting state of the dialog's open transition: it fades and rises into place. */
 @starting-style {
   .app-dialog[open] { opacity: 0; transform: translateY(10px) scale(.985); }
   .app-dialog[open]::backdrop { opacity: 0; }
@@ -491,7 +493,7 @@ body.is-card-dragging * { cursor: grabbing !important; }
   .main-content { padding-right: 56px; padding-left: 56px; }
   .board-layout { grid-template-columns: minmax(0, 1fr) 280px; gap: 25px; }
   .rates-table td { height: 76px; }
-} /* Responsive adjustments for smaller screens */
+}
 @media (max-width: 1150px) {
   .main-content { padding-right: 24px; padding-left: 24px; }
   .board-layout { grid-template-columns: minmax(0, 1fr) 235px; gap: 14px; }
@@ -567,14 +569,14 @@ body.is-card-dragging * { cursor: grabbing !important; }
   .button::after { display: none !important; }
 }
 
-/* Luminous market surfaces: soft colour stays behind the content for contrast. */
+/* Page background: soft colour washes behind the content. */
 body {
   background:
     radial-gradient(ellipse at 83% 7%, rgb(192 224 196 / 54%) 0, transparent 31%),
     radial-gradient(ellipse at 49% 58%, rgb(221 232 207 / 35%) 0, transparent 38%),
     #f3f6f1;
 }
-/* General luminous surfaces: soft colour stays behind the content for contrast. */
+/* Translucent surfaces over the page background. */
 .main-content { position: relative; }
 .status-card, .board-main, .pricing-card, .calc-card, .source-note, .history-section {
   backdrop-filter: blur(14px) saturate(118%);
@@ -613,7 +615,7 @@ body {
   content: "";
   filter: blur(35px);
   pointer-events: none;
-} /* .markets-section[hidden] { display: none !important; } */
+}
 .markets-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
 .markets-heading .card-kicker { color: #718578; }
 .markets-heading .card-kicker span { padding: 0 3px; color: #a1b29f; }
@@ -639,7 +641,7 @@ body {
   backdrop-filter: blur(16px) saturate(122%);
   transition: transform .24s cubic-bezier(.2, .75, .25, 1), border-color .24s ease, box-shadow .24s ease;
   animation: enter-up .44s ease-out both;
-} /* .market-card[hidden] { display: none !important; } */
+}
 .market-card::before {
   position: absolute;
   inset: -30px -25px auto auto;
@@ -651,7 +653,8 @@ body {
   filter: blur(32px);
   transition: opacity .25s ease, transform .35s ease;
   pointer-events: none;
-} /* The z-index of the card's children is raised above the ::before pseudo-element, so that the content is not obscured by the blurred background. */
+}
+/* Card content stays above the blurred glow. */
 .market-card > * { position: relative; z-index: 1; }
 .market-card:hover { transform: translateY(-4px); border-color: rgb(var(--asset-tint) / 44%); box-shadow: 0 16px 32px rgb(var(--asset-tint) / 14%), 0 0 28px rgb(var(--asset-tint) / 18%); }
 .market-card:hover::before { transform: scale(1.22); }
@@ -713,7 +716,7 @@ body[data-theme="night"] {
     radial-gradient(ellipse at 83% 7%, rgb(39 75 58 / 52%) 0, transparent 32%),
     radial-gradient(ellipse at 48% 58%, rgb(48 65 55 / 37%) 0, transparent 38%),
     #101a18;
-} /* Night theme luminous surfaces: soft colour stays behind the content for contrast. */
+}
 body[data-theme="night"] .markets-section { border-color: #33473b; background: linear-gradient(145deg, rgb(25 39 32 / 94%), rgb(22 34 29 / 92%)); box-shadow: 0 20px 55px rgb(0 0 0 / 23%), 0 0 35px rgb(102 148 111 / 11%); }
 body[data-theme="night"] .markets-heading h2 { color: #e0ece4; }
 body[data-theme="night"] .markets-heading p, body[data-theme="night"] .markets-heading .card-kicker { color: #9bac9f; }
@@ -882,7 +885,7 @@ body[data-theme="night"] .button-secondary:hover { border-color: #607c69; backgr
 body[data-theme="night"] .button-danger-quiet { border-color: #63423d; color: #f0b3a7; background: #2c211f; }
 body[data-theme="night"] .button-danger-quiet:hover { border-color: #83564e; background: #3a2925; }
 
-/* Persistent theme switch and the metals history frame. */
+/* Theme switch, and the frame of the metals and oil history section. */
 .theme-toggle {
   display: inline-flex;
   align-items: center;
@@ -928,23 +931,23 @@ body[data-theme="night"] .history-resolution-note a { color: #c9e2a5; }
   .theme-toggle { width: 31px; justify-content: center; padding: 0; }
   .theme-toggle > span { display: none; }
 }
-/* Here we override the default grid layout for the display options to ensure that it remains usable on smaller screens. */
+/* Display options: two columns on narrower screens. */
 @media (max-width: 1120px) {
   .display-options-grid { grid-template-columns: repeat(2, minmax(135px, 1fr)); }
 }
-/* And here we override the default grid layout for the display options to ensure that it remains usable on smaller screens. */
+/* Night theme: page background, translucent surfaces and their hover states. */
 body[data-theme="night"] {
   background:
     radial-gradient(ellipse at 83% 6%, rgb(34 69 53 / 50%) 0, transparent 36%),
     radial-gradient(ellipse at 46% 55%, rgb(42 57 49 / 34%) 0, transparent 39%),
     #101a18;
-} /* Then we override the luminous surfaces to ensure that they remain usable on smaller screens. */
+}
 body[data-theme="night"] .status-card, body[data-theme="night"] .board-main,
 body[data-theme="night"] .pricing-card, body[data-theme="night"] .calc-card,
 body[data-theme="night"] .source-note, body[data-theme="night"] .history-section {
   box-shadow: 0 16px 36px rgb(0 0 0 / 19%), 0 0 23px rgb(86 137 107 / 8%);
   backdrop-filter: blur(14px) saturate(118%);
-} /* And finally we override the hover states for the luminous surfaces to ensure that they remain usable on smaller screens. */
+}
 body[data-theme="night"] .status-card:hover, body[data-theme="night"] .calc-card:hover,
 body[data-theme="night"] .source-note:hover, body[data-theme="night"] .history-card:hover {
   box-shadow: 0 20px 42px rgb(0 0 0 / 25%), 0 0 26px rgb(112 159 119 / 13%);
@@ -978,11 +981,10 @@ body[data-theme="night"] .history-section { --chart-line-end: #7fd9d0; --probe-g
 
 /* ==========================================================================
                               Cosmos
-   A slow sky behind the workspace: drifting nebula light, two star fields and
-   an occasional comet, seen through glass surfaces. src/ui/cosmos.js paints
-   the stars once. Everything that loops here animates only transform or
-   opacity, which the browser composites without running style or layout, and
-   the reduced-motion rule above stops all of it.
+   Animated backdrop: nebula light, two star fields and an occasional comet
+   behind translucent surfaces. src/ui/cosmos.js paints the stars once; the
+   looping animations below change only transform and opacity, so they run on
+   the compositor, and the reduced-motion rule above turns them off.
    ========================================================================== */
 .cosmos { position: fixed; z-index: 0; inset: 0; overflow: hidden; pointer-events: none; }
 .app-shell { position: relative; z-index: 1; }
@@ -1035,7 +1037,7 @@ body[data-theme="night"] .history-section { --chart-line-end: #7fd9d0; --probe-g
 }
 .history-range[aria-pressed="true"] { box-shadow: 0 1px 4px rgb(35 71 51 / 9%), 0 0 0 1px rgb(112 210 180 / 30%), 0 0 16px rgb(112 210 180 / 24%); }
 
-/* The page title catches the light now and then, and its full stop glows like a star. */
+/* Page title: a light sweep when fresh rates arrive (catchLight in app.js) and a glowing full stop. */
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   h1 { background: linear-gradient(100deg, var(--ink) 0 42%, var(--title-sheen, #2f9e86) 50%, var(--ink) 58% 100%) 100% 0 / 240% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
   h1.is-catching-light { animation: title-sheen 1.6s ease-in-out; }
@@ -1052,8 +1054,8 @@ body[data-theme="night"] .history-section { --chart-line-end: #7fd9d0; --probe-g
   to { opacity: 1; transform: scale(1.2); }
 }
 
-/* Small signs of life: status dots send out a ring, the brand squares twinkle in turn,
-   and the primary button catches a sheen on hover. */
+/* Ambient details: status dots pulse, the brand squares twinkle in turn, and the primary
+   button shows a sheen on hover. */
 .pulse-dot, .source-dot, .market-live-dot, .status-tag .status-dot { position: relative; }
 .pulse-dot::after, .source-dot::after, .markets-update[data-state="ready"] .market-live-dot::after, .status-tag[data-state="fresh"] .status-dot::after { position: absolute; inset: 0; border-radius: 50%; background: inherit; content: ""; animation: dot-ping 2.6s ease-out infinite; }
 @keyframes dot-ping {
@@ -1081,7 +1083,7 @@ body[data-theme="night"] .history-section { --chart-line-end: #7fd9d0; --probe-g
 .sidebar-stars { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; animation: twinkle-far 7s steps(21) infinite alternate; }
 .sidebar::after { position: absolute; z-index: -1; inset: auto -45% -14% -45%; height: 48%; border-radius: 50%; background: radial-gradient(closest-side, rgb(124 108 232 / 36%), rgb(124 108 232 / 0)); content: ""; pointer-events: none; animation: nebula-c 44s steps(176) infinite alternate; }
 
-/* Night: deep space. */
+/* Night theme: backdrop colours for the effects above. */
 body[data-theme="night"] {
   --title-sheen: #9ff0d8;
   background:
