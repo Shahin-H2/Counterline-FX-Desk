@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import { compareDecimals, decimalFromNumber, formatDecimal, isPositiveDecimal, multiplyAndRound, parseDecimal } from "../src/domain/decimal.js";
