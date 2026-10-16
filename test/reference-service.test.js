@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createReferenceService } from "../src/server/reference-service.mjs";
