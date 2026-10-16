@@ -1,0 +1,61 @@
+Counterline FX Desk
+Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+
+PROPRIETARY LICENSE
+
+This repository, including its source code, documentation, images and icons, and the
+installers published on its Releases page (together, the "Software"), is the property of
+Shahin Hassanyan (the "Author") and is protected by copyright law and international treaties.
+The Software is not open source.
+
+1. Viewing only
+
+   The source code is publicly visible so that it can be read as an example of the Author's
+   work. Except as stated in section 2, no right or license is granted to you under any
+   copyright or other intellectual property right of the Author. Without the Author's prior
+   written permission you may not:
+
+   a. copy or reproduce the Software, in whole or in part, beyond what your web browser does
+      to display it, or what section 4 allows;
+   b. modify, adapt or translate the Software, or create derivative works based on it;
+   c. distribute, publish, sublicense, sell, rent, lease, lend or otherwise make the Software,
+      or any part of it, available to anyone else, whether for payment or free of charge;
+   d. use the Software, or any part of it, including its code, design, text, images or name,
+      in any other product or service, commercial or not;
+   e. remove, alter or obscure any copyright notice or this license.
+
+2. Installing the application
+
+   You may download the installers that the Author publishes on this repository's Releases
+   page, and install and run the application for its intended purpose. You may not modify,
+   decompile, disassemble or reverse engineer the application, except to the extent that
+   applicable law expressly permits it despite this restriction, and you may not redistribute
+   the installers.
+
+3. Third-party components and data
+
+   The installers include third-party software, such as Electron and Chromium, which remains
+   under its own licenses; those license notices are installed with the application. Market
+   data shown by the application comes from third parties, including Frankfurter and the U.S.
+   Energy Information Administration, and is subject to their terms.
+
+4. GitHub
+
+   Nothing in this license limits the rights that GitHub's Terms of Service give GitHub users
+   to view and fork public repositories on GitHub. Those rights do not include using,
+   modifying or distributing the Software outside GitHub.
+
+5. No warranty and limitation of liability
+
+   THE SOFTWARE AND THE DATA IT DISPLAYS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+   PURPOSE, ACCURACY AND NON-INFRINGEMENT. Rates shown by the application are indicative
+   reference data, not quotes or offers to trade, and may be delayed, incomplete or wrong.
+   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE AUTHOR SHALL NOT BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING LOSSES FROM DECISIONS MADE ON THE BASIS OF THE
+   SOFTWARE OR ITS DATA, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+6. Permission requests
+
+   For any use not permitted above, contact the Author through the contact details on the
+   Author's GitHub profile to request written permission.
