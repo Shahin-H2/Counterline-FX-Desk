@@ -1,15 +1,17 @@
 # How `npm run dist` packages the desktop app. Options: https://www.electron.build/configuration
 appId: com.shahinhassanyan.counterline-fx-desk
 productName: Counterline FX Desk
+copyright: Copyright © 2026 Shahin Hassanyan. All rights reserved.
 directories:
   output: dist
 # The app does not update itself, so no update feed is written into it or beside the installers.
 publish: null
 
-# Only what the app runs on goes into an installer. Everything else in this folder stays out of
-# it, including .env and the tests.
+# Only what the app runs on, and its license, goes into an installer. Everything else in this
+# folder stays out of it, including .env and the tests.
 files:
   - package.json
+  - LICENSE
   - server.mjs
   - index.html
   - display.html
@@ -20,9 +22,8 @@ files:
 mac:
   category: public.app-category.finance
   icon: build/icon-mac.png
-  # No Apple Developer ID yet, so the app gets a local ("ad-hoc") signature. Without one, macOS
-  # tells whoever downloads the app that it is damaged; with one, it offers "Open Anyway".
-  # Delete this line once a Developer ID certificate is set up, and the build will use that.
+  # Ad-hoc signature until a Developer ID certificate is configured; macOS reports an unsigned
+  # download as damaged. Remove this line to sign with the certificate instead.
   identity: "-"
   artifactName: Counterline-FX-Desk-${version}-mac.${ext}
   target:
