@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
+// HTTP server and request handler. Serves the pages, fetches and caches reference data
+// (Frankfurter for currencies and metals, EIA for crude oil) and fills chart gaps with labelled
+// estimates. The desktop app (desktop/main.mjs) uses the same handler without an HTTP port.
+
 import { createServer } from "node:http";
 import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -12,8 +18,8 @@ import { createReferenceService } from "./src/server/reference-service.mjs";
 const projectRoot = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const ENV_NAMES = ["EIA_API_KEY"];
 
-// Copies the market settings in a .env style file into process.env, unless they are already set
-// there. `npm start` reads .env in the project folder; the desktop app names a file of its own.
+// Loads market settings from a .env style file into process.env without overriding variables
+// that are already set. Defaults to .env in the project folder; the desktop app passes its own.
 export async function loadMarketEnvironment(file = resolve(projectRoot, ".env")) {
   const assignment = new RegExp(`^\\s*(${ENV_NAMES.join("|")})\\s*=\\s*(.*?)\\s*$`);
   try {
@@ -412,7 +418,7 @@ export function createApp({
       }
     }
 
-    // Nothing to anchor on: say so rather than invent a price level.
+    // No reference price to anchor an estimate on: report the series as unavailable.
     for (const request of open.values()) {
       const note = notes.get(request.id) ?? { reason: "no-reference-data", message: "No source returned data, and there is no reference price to estimate from." };
       rates[request.id] = [];
