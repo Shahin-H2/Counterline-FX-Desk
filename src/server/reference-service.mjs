@@ -1,3 +1,8 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
+// Latest reference rates for a set of pairs, cached for ten minutes. When the provider fails, the
+// last good response is served, marked as a stale cache.
+
 import { fetchFrankfurterRates, FRANKFURTER_SOURCE } from "./frankfurter-provider.mjs";
 
 const pairKey = (pair) => `${pair.base}/${pair.quote}`;
