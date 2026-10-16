@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
+// Exact decimal arithmetic for rates and amounts, on BigInt coefficients rather than binary floats.
+
 const DECIMAL_PATTERN = /^(?:\d+)(?:\.(\d+))?$/;
 
 export function toPlainDecimal(value) {
