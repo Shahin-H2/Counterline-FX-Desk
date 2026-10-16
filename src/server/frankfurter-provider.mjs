@@ -1,3 +1,8 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
+// Frankfurter API client (api.frankfurter.dev): latest and historical reference rates and the
+// currency list, returned as exact decimal strings in the requested pair direction.
+
 import { decimalFromNumber, toPlainDecimal } from "../domain/decimal.js";
 
 export const FRANKFURTER_SOURCE = "Frankfurter daily blended reference rates";
