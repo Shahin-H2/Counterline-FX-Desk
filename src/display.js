@@ -1,6 +1,8 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
 // The customer display: the desk's own buy and sell prices, large, for a screen that faces
-// customers. It reads the prices the main workspace saved in this browser and redraws whenever
-// they change there. Reference rates never appear here, and nothing is requested from the network.
+// customers. It reads the prices saved by the workspace page and redraws whenever they change.
+// Reference rates never appear here, and nothing is requested from the network.
 import { formatDecimal } from "./domain/decimal.js";
 import { createCosmos } from "./ui/cosmos.js";
 
