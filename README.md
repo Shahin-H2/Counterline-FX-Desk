@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="build/icon-mac.png" alt="Counterline FX Desk icon" width="110">
+  <img src="build/icon-mac.png" alt="Counterline FX Desk icon" width="100">
 </p>
 
 <h1 align="center">Counterline FX Desk</h1>
