@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
+// Sort orders for the chart cards and the market cards.
+
 export const CARD_SORTS = ["custom", "name-asc", "name-desc", "price-asc", "price-desc"];
 
 // Orders cards for display and returns their ids. `cards` is [{ id, name, price }] in the custom
