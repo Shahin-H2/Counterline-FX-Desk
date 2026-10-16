@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
 // How a desk's customer prices sit against the reference rate. A price is in quote units per one
 // base unit, like the reference. The desk earns when it buys the base below the reference and
 // sells it above; the percentages here are shares of the reference rate.
