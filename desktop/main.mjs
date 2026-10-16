@@ -1,9 +1,10 @@
-// The desktop app: Counterline FX Desk in a window of its own, with nothing to install or start.
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
 //
-// `npm start` puts the app behind an HTTP port. Here the same request handler answers the window
-// directly, under the app's own address (app://counterline). No port is opened, so nothing else
-// on the computer or the network can reach it, and because that address never changes, the desk
-// prices saved in the window are still there the next time the app is opened.
+// Desktop app entry point (Electron).
+//
+// The window is served by the same request handler as `npm start`, through a privileged app://
+// protocol instead of an HTTP port. Nothing else on the machine can reach it, and the fixed origin
+// keeps the desk's saved settings from one launch to the next.
 
 import { app, BrowserWindow, Menu, net, protocol, screen, session, shell } from "electron";
 import { join } from "node:path";
@@ -12,10 +13,10 @@ import { createApp, loadMarketEnvironment } from "../server.mjs";
 const SCHEME = "app";
 const HOST = "counterline";
 const HOME = `${SCHEME}://${HOST}/`;
-// All a page may ask the computer for: copying the rate sheet, and the customer display's full
-// screen button.
+// Permissions a page may be granted: clipboard writes (rate sheet) and full screen (customer
+// display). Everything else is refused.
 const PERMISSIONS = new Set(["clipboard-sanitized-write", "fullscreen"]);
-// The pages are ordinary web pages. They get no access to Node or to Electron.
+// Pages run sandboxed, with no access to Node or Electron.
 const WEB_PREFERENCES = { contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false };
 
 let mainWindow = null;
@@ -29,7 +30,7 @@ function isOwnPage(address) {
   }
 }
 
-// Links to other sites, such as a data source's terms, open in the computer's own browser.
+// External https links open in the default browser.
 function openOutside(address) {
   if (/^https:\/\//i.test(address)) shell.openExternal(address);
 }
