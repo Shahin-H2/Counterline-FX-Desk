@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
 // Daily crude oil spot prices from the U.S. Energy Information Administration (EIA).
 //
 // EIA publishes them about once a week, a few days in arrears, in US dollars per barrel. Two
