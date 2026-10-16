@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
 // The star fields behind the page and inside the sidebar.
 //
 // Stars are painted onto canvases once, and again only when the window is resized or the theme
@@ -7,7 +9,7 @@
 
 const STAR_COLOURS = {
   night: [[255, 255, 255], [206, 226, 255], [255, 232, 196], [186, 250, 228]],
-  // On the light theme the same sky reads as fine dust in the theme's own inks.
+  // The light theme draws fewer, fainter stars in the theme's accent colours.
   day: [[40, 122, 104], [176, 132, 46], [104, 96, 190]],
 };
 
