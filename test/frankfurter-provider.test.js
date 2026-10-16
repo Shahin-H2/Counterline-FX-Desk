@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fetchFrankfurterHistory, fetchFrankfurterRates } from "../src/server/frankfurter-provider.mjs";
