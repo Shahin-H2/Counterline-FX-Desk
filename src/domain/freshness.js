@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Shahin Hassanyan. All rights reserved.
+//
+// How old a daily observation is, and when it counts as stale.
+
 export const STALE_AFTER_CALENDAR_DAYS = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
